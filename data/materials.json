@@ -1,0 +1,439 @@
+{
+  "currency": "EUR",
+  "sections": [
+    {
+      "id": "kitchen",
+      "label": "Cuisine",
+      "items": [
+        {
+          "product": "Mitigeur Grohe Blue",
+          "reference": "31541DC0",
+          "supplierLink": "https://www.reuter.com/fr/fr/grohe-blue-home-mitigeur-de-cuisine-avec-systeme-de-filtration-extractible-pivotant-supersteel-a627074.php",
+          "price": {
+            "ttc": 2035.64,
+            "htQuote": 1850.58
+          },
+          "approvals": {
+            "client": {
+              "status": "approved",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "13/02",
+            "delivery": {
+              "date": "18/02",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Évier Grohe K700",
+          "reference": "31574SD1",
+          "supplierLink": "https://www.reuter.com/fr/fr/grohe-k700-evier-de-cuisine-actionne-manuel-54-44-cm-acier-inoxydable-satine-a9358.php",
+          "price": {
+            "ttc": 228.56,
+            "htQuote": 207.78
+          },
+          "approvals": {
+            "client": {
+              "status": "change_order",
+              "note": "ok avenant"
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "31/10",
+            "delivery": {
+              "date": "13/11",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Suspension Estiluz Volta (T-3536-W, noir, LED 2700K, 3×565 lm, 86.7×54.3 cm)",
+          "reference": null,
+          "supplierLink": null,
+          "price": {
+            "ttc": null,
+            "htQuote": null
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "rejected",
+              "note": "non validé"
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": "non validé",
+            "client": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "wc-1",
+      "label": "WC 1",
+      "items": [
+        {
+          "product": "Lave-mains Villeroy & Boch Avento, blanc",
+          "reference": null,
+          "supplierLink": null,
+          "price": {
+            "ttc": null,
+            "htQuote": null
+          },
+          "approvals": {
+            "client": {
+              "status": "supplied_by",
+              "note": "fournisseur partenaire"
+            },
+            "cray": {
+              "status": "supplied_by",
+              "note": "fournisseur partenaire"
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": null
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Mitigeur Grohe (lave-mains)",
+          "reference": null,
+          "supplierLink": null,
+          "price": {
+            "ttc": 118.1,
+            "htQuote": 107.36
+          },
+          "approvals": {
+            "client": {
+              "status": "approved",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "31/10",
+            "delivery": {
+              "date": "13/11",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Plaque de déclenchement Geberit Omega 20 (chrome/blanc mat)",
+          "reference": null,
+          "supplierLink": "https://www.reuter.com/fr/fr/geberit-omega20-plaque-de-declenchement-double-chasse-finition-chrome-blanc-mat-a1156144.php",
+          "price": {
+            "ttc": 118.1,
+            "htQuote": 107.36
+          },
+          "approvals": {
+            "client": {
+              "status": "approved",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "31/10",
+            "delivery": {
+              "date": "13/11",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "WC suspendu compact Geberit iCon + abattant",
+          "reference": null,
+          "supplierLink": "https://www.reuter.com/fr/fr/geberit-icon-cuvette-suspendue-wc-abattant-wc-l49-36-cm-version-courte-blanc-a1137082.php",
+          "price": {
+            "ttc": 399.46,
+            "htQuote": 363.15
+          },
+          "approvals": {
+            "client": {
+              "status": "change_order",
+              "note": "ok avenant"
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "31/10",
+            "delivery": {
+              "date": "13/11",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Papier peint Sandberg Pine Grey",
+          "reference": null,
+          "supplierLink": null,
+          "price": {
+            "ttc": null,
+            "htQuote": null
+          },
+          "approvals": {
+            "client": {
+              "status": "change_order",
+              "note": "ok avenant"
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "10/01",
+            "delivery": {
+              "date": null,
+              "status": "livré"
+            },
+            "quantity": null
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "sde-parentale",
+      "label": "Suite parentale",
+      "items": [
+        {
+          "product": "Meuble vasque Sklum Aldeia",
+          "reference": null,
+          "supplierLink": "https://www.reuter.com/fr/acheter-ensembles-de-meubles-de-salle-de-bain/169958-ensemble-de-meubles-de-salle-de-bain",
+          "price": {
+            "ttc": 529.94,
+            "htQuote": 481.76
+          },
+          "approvals": {
+            "client": {
+              "status": "change_order",
+              "note": "avenant ok"
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "07/11",
+            "delivery": {
+              "date": null,
+              "status": "livré"
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Hansgrohe corps d'encastrement (ref 13628000)",
+          "reference": "13628000",
+          "supplierLink": "https://www.reuter.com/fr/fr/hansgrohe-corps-dencastrement-pour-mitigeur-mural-encastre-lavabo-a213772.php",
+          "price": {
+            "ttc": 160.9,
+            "htQuote": 146.27
+          },
+          "approvals": {
+            "client": {
+              "status": "change_order",
+              "note": "avenant ok"
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "23/10",
+            "delivery": {
+              "date": "29/10",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Mitigeur de lavabo Hansgrohe Tecturis S avec EcoSmart",
+          "reference": null,
+          "supplierLink": "https://www.reuter.com/fr/fr/hansgrohe-tecturis-s-mitigeur-de-lavabo-avec-ecosmart-noir-brosse-a1186067.php",
+          "price": {
+            "ttc": 285.37,
+            "htQuote": 259.43
+          },
+          "approvals": {
+            "client": {
+              "status": "change_order",
+              "note": "avenant ok"
+            },
+            "cray": {
+              "status": "pending",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "28/11",
+            "delivery": {
+              "date": "28/02",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": "3 à 5 semaines",
+            "client": null
+          }
+        },
+        {
+          "product": "Armoire de toilette Geberit Option (70×15 cm, 2 portes)",
+          "reference": null,
+          "supplierLink": "https://www.reuter.com/fr/fr/geberit-option-armoire-de-toilette-70-15-cm-2-portes-montage-en-applique-a1186027.php",
+          "price": {
+            "ttc": 516.83,
+            "htQuote": 469.85
+          },
+          "approvals": {
+            "client": {
+              "status": "change_order",
+              "note": "avenant ok"
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "23/10",
+            "delivery": {
+              "date": "29/10",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Hansgrohe iBox universel avec robinet d'arrêt (ref 01850180)",
+          "reference": "01850180",
+          "supplierLink": "https://www.reuter.com/fr/fr/hansgrohe-ibox-corps-encastre-universel-avec-robinet-darret-a377492.php",
+          "price": {
+            "ttc": 139.48,
+            "htQuote": 126.8
+          },
+          "approvals": {
+            "client": {
+              "status": "approved",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "23/10",
+            "delivery": {
+              "date": "29/10",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        }
+      ]
+    }
+  ]
+}

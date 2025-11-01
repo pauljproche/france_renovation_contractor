@@ -17,8 +17,8 @@ This project aims to streamline communication and task management for apartment 
 ## MVP Phases
 
 ### Phase 1: Web Dashboard MVP
-- **Web-based dashboard** with LLM integration
-- **Tabular data display** showing project information (requirements, materials, prices, timelines)
+- **Dashboard landing page** with at-a-glance metrics (orders pending, spend, deliveries) and a persistent LLM prompt card
+- **Dedicated materials view** hosting the tabular dataset (`materials.json`) with filters and deep links back to the dashboard
 - **Natural language query interface** allowing users to ask questions about:
   - What needs to be validated
   - What items need to be purchased
@@ -26,6 +26,11 @@ This project aims to streamline communication and task management for apartment 
   - Timeline/scheduling
 - **LLM responses** based on the displayed tabular data
 - **Role-based access** (contractor, client, architect, etc.)
+
+#### Phase 1 UI Layout
+- The landing page provides quick KPIs, recent alerts, and the “Ask the assistant” form so stakeholders know what’s available before prompting the LLM.
+- The materials page focuses on detailed tabular data; the assistant UI remains accessible (drawer/modal) for context-aware questions.
+- Navigation between the two views should be obvious (breadcrumb or primary nav) to keep discovery simple for new users.
 
 ### Phase 2: Backend Data Integration
 - **Backend API** to store and manage project data
@@ -164,6 +169,70 @@ france_renovation_contractor/
 └── docs/                    # Additional documentation
 ```
 
+## Getting Started (Phase 1 Dashboard)
+
+### Backend Setup (FastAPI)
+
+1. **Navigate to backend directory**
+   ```bash
+   cd backend
+   ```
+
+2. **Create virtual environment (recommended)**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Configure environment variables**
+   - Copy `.env.example` to `.env`
+   - Edit `.env` and add your OpenAI API key:
+   ```bash
+   OPENAI_API_KEY=sk-proj-your-key-here
+   OPENAI_MODEL=gpt-4o-mini
+   ```
+
+5. **Run the FastAPI server**
+   ```bash
+   uvicorn main:app --reload --port 8000
+   ```
+   The API will be available at `http://localhost:8000`
+
+### Frontend Setup (React)
+
+1. **Install dependencies**
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+2. **Optional: Configure backend URL** – create `frontend/.env.local` if you need to change the backend URL:
+   ```bash
+   VITE_API_BASE_URL=http://localhost:8000
+   ```
+   (Defaults to `http://localhost:8000` if not set)
+
+3. **Run the dev server**
+   ```bash
+   npm run dev
+   ```
+
+4. **Validate data regularly**
+   ```bash
+   npm run lint:data
+   ```
+   This reuses `scripts/validateMaterials.js` to make sure the dashboard and assistant see clean data.
+
+### Running Both Services
+
+- **Terminal 1**: Run FastAPI backend (`cd backend && uvicorn main:app --reload`)
+- **Terminal 2**: Run React frontend (`cd frontend && npm run dev`)
+
 ## Notes
 
 - Focus on French apartment renovation context and requirements
@@ -171,4 +240,5 @@ france_renovation_contractor/
 - Ensure GDPR compliance for client data
 - Support multiple concurrent projects
 - Design for scalability as more contractors/clients are added
+
 
