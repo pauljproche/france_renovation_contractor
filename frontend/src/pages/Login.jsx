@@ -24,6 +24,7 @@ export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -31,11 +32,17 @@ export default function Login() {
     
     // Simple authentication - in production, this would check against a database
     if (username && password) {
+      setLoading(true);
+      
       // Store auth state (in production, use proper auth tokens)
       sessionStorage.setItem('authenticated', 'true');
       sessionStorage.setItem('username', username);
       sessionStorage.setItem('justLoggedIn', 'true');
-      navigate('/dashboard');
+      
+      // Add 1.5 second delay before navigating to dashboard
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
     } else {
       setError('Please enter both username and password');
     }
@@ -82,8 +89,8 @@ export default function Login() {
             
             {error && <p className="login-error">{error}</p>}
             
-            <button type="submit" className="login-submit-btn">
-              {t('loginButton')}
+            <button type="submit" className="login-submit-btn" disabled={loading}>
+              {loading ? t('loginSigningIn') : t('loginButton')}
             </button>
           </form>
         </div>

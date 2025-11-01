@@ -19,6 +19,7 @@ export const translations = {
     loginPassword: 'Password',
     loginPasswordPlaceholder: 'Enter your password',
     loginButton: 'Sign In',
+    loginSigningIn: 'Signing in...',
     
     // Landing Page
     landingTitle: 'Streamline Your Renovation Projects',
@@ -130,6 +131,7 @@ export const translations = {
     loginPassword: 'Mot de passe',
     loginPasswordPlaceholder: 'Saisissez votre mot de passe',
     loginButton: 'Se connecter',
+    loginSigningIn: 'Connexion...',
     
     // Landing Page
     landingTitle: 'Simplifiez Vos Projets de Rénovation',
