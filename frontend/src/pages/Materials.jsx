@@ -1,10 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from '../hooks/useTranslation.js';
+import { useAIPanel } from '../contexts/AppContext.jsx';
 import EditableMaterialsTable from '../components/EditableMaterialsTable.jsx';
 
 function Materials() {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
+  const { setIsAIPanelOpen } = useAIPanel();
+
+  // Open AI panel when navigating from project page
+  useEffect(() => {
+    const openAIPanel = sessionStorage.getItem('openAIPanel');
+    if (openAIPanel === 'true') {
+      setIsAIPanelOpen(true);
+      sessionStorage.removeItem('openAIPanel');
+    }
+  }, [setIsAIPanelOpen]);
 
   return (
     <>

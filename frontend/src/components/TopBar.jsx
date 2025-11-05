@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRole, ROLES, useLanguage, useAIPanel } from '../contexts/AppContext.jsx';
+import { useProjects } from '../contexts/ProjectsContext.jsx';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useChatHistory } from '../contexts/ChatHistoryContext.jsx';
 
 function RoleSwitcher() {
   const { role, setRole } = useRole();
@@ -42,6 +44,8 @@ function Breadcrumbs() {
   const { t } = useTranslation();
 
   const pathMap = {
+    '/global-dashboard': t('globalDashboardTitle'),
+    '/settings': t('settings'),
     '/dashboard': t('navDashboard'),
     '/materials': t('navMaterials'),
     '/chat-history': t('navChatHistory')
@@ -62,9 +66,15 @@ function Breadcrumbs() {
 export default function TopBar() {
   const { t } = useTranslation();
   const { isAIPanelOpen, toggleAIPanel } = useAIPanel();
+  const { projects } = useProjects();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const profileMenuRef = useRef(null);
+  
+  const isGlobalDashboard = location.pathname === '/global-dashboard';
+  const isSettings = location.pathname === '/settings';
+  const isTrackingPage = ['/dashboard', '/materials', '/chat-history'].includes(location.pathname);
   
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -82,13 +92,16 @@ export default function TopBar() {
     };
   }, [showProfileMenu]);
   
+  const { clearHistory } = useChatHistory();
+  
   const handleLogout = () => {
     sessionStorage.removeItem('authenticated');
     sessionStorage.removeItem('username');
     localStorage.removeItem('aiPanelOpen');
+    clearHistory(); // Clear chat history on logout
     navigate('/');
   };
-  
+
   return (
     <header className="top-bar">
       <div className="top-bar-left">
@@ -98,14 +111,23 @@ export default function TopBar() {
         <Breadcrumbs />
       </div>
       <div className="top-bar-right">
+        {isTrackingPage && (
+          <Link
+            to="/global-dashboard"
+            className="top-bar-link"
+          >
+            {t('navProjects')}
+          </Link>
+        )}
         <RoleSwitcher />
         <LanguageToggle />
-        <button 
-          className="ai-toggle-btn" 
-          type="button" 
-          title={isAIPanelOpen ? 'Masquer l\'assistant IA' : 'Afficher l\'assistant IA'}
-          onClick={toggleAIPanel}
-        >
+        {!isGlobalDashboard && (
+          <button 
+            className="ai-toggle-btn" 
+            type="button" 
+            title={isAIPanelOpen ? 'Masquer l\'assistant IA' : 'Afficher l\'assistant IA'}
+            onClick={toggleAIPanel}
+          >
           {isAIPanelOpen ? (
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -116,7 +138,8 @@ export default function TopBar() {
               <circle cx="18" cy="6" r="4" fill="currentColor"/>
             </svg>
           )}
-        </button>
+          </button>
+        )}
         <div className="profile-menu" ref={profileMenuRef}>
           <button 
             className="profile-btn" 

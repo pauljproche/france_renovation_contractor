@@ -1,22 +1,83 @@
 # France Renovation Contractor Dashboard & Bot
 
-A web-based dashboard and Zulip chatbot system for managing apartment renovation projects in France. The system enables contractors, clients, architects, and other stakeholders to interact with an LLM-powered assistant to query project data, track tasks, validate requirements, and manage renovation workflows.
+A comprehensive web-based system for managing apartment renovation projects in France. The platform enables contractors, clients, architects, and other stakeholders to create detailed project estimates (devis) and track project execution through an intelligent LLM-powered interface.
 
-## Project Overview
+## System Architecture Overview
 
-This project aims to streamline communication and task management for apartment renovation projects in France through an intelligent LLM-powered interface. The system will help stakeholders quickly access information about project requirements, materials, costs, timelines, and action items.
+The application is structured around a **two-part workflow** that mirrors the real-world renovation process:
 
-## Goals
+### User Flow
+
+```
+Landing Page
+    ↓
+Global Dashboard (Project Selection)
+    ↓
+Create New Project → Creating Devis
+    ↓
+Complete Devis → Unlock Tracking
+    ↓
+Track Project Execution
+```
+
+### Core Components
+
+1. **Landing Page** - Marketing and initial entry point
+2. **Global Dashboard** ✅ **Implemented** - Central hub showing all renovation projects
+   - Project cards with status indicators (Draft, Ready, Active, Completed, Archived)
+   - Project metrics (total projects, completion rate, client approvals, invoices, costs)
+   - Create new projects (placeholder for future devis creation)
+   - Navigate between projects
+   - Demo projects for testing and onboarding
+   - Project lifecycle management (delete, convert demos)
+   - Settings page for language, role, and theme preferences
+3. **Creating Devis** - HEMEA-like interface for building detailed project estimates (Planned)
+   - Add materials, sections, pricing
+   - Create comprehensive devis/estimates
+   - Once complete, unlocks Tracking for that project
+4. **Tracking System** ✅ **Implemented** - Execution tracking and project management
+   - Track materials, approvals, deliveries
+   - LLM-powered assistant with bilingual responses (English/French)
+   - Chat history with language-aware display
+   - Real-time data updates
+   - Role-based access (Contractor, Client, Architect)
+   - Multi-project support with project selection
+
+### Terminology Note
+
+- **User-facing UI**: Uses "Creating" / "Create Devis" and "Tracking" 
+- **Technical documentation**: Uses "Phase 1" (Creating Devis) and "Phase 2" (Tracking) for development planning
+- **Zulip chatbot phases**: Continue to use "Phase 2.3", "Phase 2.4" etc. for chatbot feature development
+
+### Project Structure
+
+Each renovation project follows this lifecycle:
+- **Draft**: Project created, devis in progress
+- **Ready**: Devis complete, tracking unlocked
+- **Active**: Tracking in progress
+- **Completed**: Project finished
+- **Archived**: Historical reference
+
+At any point, users can return to the Global Dashboard to switch between projects or create new ones.
+
+## Phase 2: Tracking System (Current Implementation)
+
+This repository currently contains the **Phase 2: Tracking System** implementation. The tracking system enables stakeholders to monitor project execution, track materials, manage approvals, and interact with an AI assistant for project queries.
+
+## Phase 2: Tracking System Goals
 
 1. **Provide instant access to project information** via natural language queries
 2. **Track and manage action items** across different roles (contractor, client, architect)
 3. **Centralize project data** in a tabular format accessible via web dashboard
 4. **Enable fast interactions** through Zulip chatbot integration
 5. **Facilitate cross-role communication** and task assignment
+6. **Support multiple projects** through the global dashboard architecture
 
-## MVP Phases
+## Phase 2: Tracking System Implementation Roadmap
 
-### Phase 1: Web Dashboard MVP
+The tracking system is being developed in phases:
+
+### Phase 2.1: Tracking Web Dashboard MVP
 - **Dashboard landing page** with at-a-glance metrics (orders pending, spend, deliveries) and a persistent LLM prompt card
 - **Dedicated materials view** hosting the tabular dataset (`materials.json`) with filters and deep links back to the dashboard
 - **Natural language query interface** allowing users to ask questions about:
@@ -27,24 +88,24 @@ This project aims to streamline communication and task management for apartment 
 - **LLM responses** based on the displayed tabular data
 - **Role-based access** (contractor, client, architect, etc.)
 
-#### Phase 1 UI Layout
+#### Phase 2.1 Tracking UI Layout
 - The landing page provides quick KPIs, recent alerts, and the “Ask the assistant” form so stakeholders know what’s available before prompting the LLM.
 - The materials page focuses on detailed tabular data; the assistant UI remains accessible (drawer/modal) for context-aware questions.
 - Navigation between the two views should be obvious (breadcrumb or primary nav) to keep discovery simple for new users.
 
-### Phase 2: Backend Data Integration
+### Phase 2.2: Tracking Backend Data Integration
 - **Backend API** to store and manage project data
 - **Database integration** for persistent storage
 - **LLM access to backend data** instead of webpage scraping
 - **Real-time data updates** reflected in LLM responses
 
-### Phase 3: Zulip Chatbot Integration
+### Phase 2.3: Tracking Zulip Chatbot Integration
 - **Zulip bot** (`@contractor_bot` or similar)
 - **Natural language queries** via Zulip mentions
 - **LLM responses** based on backend data
 - **Action item tracking** integrated with chat context
 
-### Phase 4: Task Management & To-Do Lists
+### Phase 2.4: Tracking Task Management & To-Do Lists
 - **Role-based to-do lists** ("What do I need to do?")
 - **Action item popups** showing:
   - Items to be ordered
@@ -77,8 +138,8 @@ This project aims to streamline communication and task management for apartment 
 - Notify relevant parties of task assignments
 
 ### Data Management
-- Tabular data display (Phase 1)
-- Backend database (Phase 2+)
+- Tabular data display (Phase 2.1)
+- Backend database (Phase 2.2+)
 - Real-time updates
 - Historical tracking
 
@@ -145,9 +206,27 @@ This project aims to streamline communication and task management for apartment 
 - Task assignments and status
 - Role permissions and access
 
+## Creating Devis (Future Implementation - Phase 1)
+
+The Creating Devis interface will provide a HEMEA-like experience for building detailed renovation project estimates:
+
+- **Project setup** - Create new renovation projects from global dashboard
+- **Section management** - Organize work by rooms/areas (kitchen, bathroom, etc.)
+- **Material catalog** - Add materials with references, suppliers, pricing
+- **Cost calculation** - Automatic TTC calculations, totals, budgets
+- **Devis generation** - Export professional estimates
+- **Multi-project support** - Manage multiple renovation projects simultaneously
+
+Once a devis is marked complete, Tracking becomes available for that project.
+
 ## Future Enhancements
 
-- **Multi-language support** (French/English)
+### Phase 2 Enhancements
+- **Multi-language support** (French/English) ✅ **Fully implemented**
+  - UI language toggle (English/French)
+  - LLM generates bilingual responses (English and French)
+  - Chat history displays in selected language
+  - Language preference persists across sessions
 - **Document upload and parsing** (plans, invoices, permits)
 - **Image recognition** for progress tracking
 - **Automated notifications** for deadlines and pending tasks
@@ -157,19 +236,70 @@ This project aims to streamline communication and task management for apartment 
 - **Cost tracking and budget management**
 - **Supplier management** and ordering automation
 
+### System-Wide Enhancements
+- **Theme customization** ✅ **Implemented** (Purple/Blue themes)
+- **Project lifecycle management** ✅ **Implemented** (status indicators, project cards, metrics)
+- **Settings page** ✅ **Implemented** (language, role, theme preferences)
+- **Project templates** for common renovation types
+- **Team collaboration** features across projects
+- **Client portal** for approvals and updates
+- **Export/import** functionality for project data
+
 ## Project Structure
 
 ```
 france_renovation_contractor/
 ├── README.md                 # This file
-├── frontend/                 # Web dashboard (Phase 1+)
-├── backend/                 # API and data management (Phase 2+)
-├── zulip_bot/               # Zulip chatbot integration (Phase 3+)
+├── frontend/                 # React app (currently Phase 2: Tracking)
+│   ├── src/
+│   │   ├── pages/           # Page components (Dashboard, Materials, etc.)
+│   │   ├── components/       # UI components
+│   │   └── ...
+├── backend/                 # FastAPI backend (Phase 2: Tracking API)
+├── zulip_bot/               # Zulip chatbot integration (Phase 2.3+)
 ├── data/                    # Sample data and schemas
+│   └── materials.json       # Current tracking data structure
 └── docs/                    # Additional documentation
+
+# Current structure (Phase 2):
+├── frontend/
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── GlobalDashboard.jsx    ✅ Implemented: Project selection & management
+│   │   │   ├── Dashboard.jsx           ✅ Tracking dashboard
+│   │   │   ├── Materials.jsx           ✅ Materials tracking
+│   │   │   ├── ChatHistory.jsx        ✅ Chat history
+│   │   │   ├── Settings.jsx            ✅ Settings page
+│   │   │   ├── Login.jsx               ✅ Authentication
+│   │   │   └── Landing.jsx             ✅ Landing page
+│   │   ├── components/
+│   │   │   ├── AIPanel.jsx             ✅ LLM assistant panel
+│   │   │   ├── ProjectCard.jsx        ✅ Project card component
+│   │   │   ├── Layout.jsx              ✅ Main layout with sidebar
+│   │   │   └── ...
+│   │   ├── contexts/
+│   │   │   ├── ProjectsContext.jsx      ✅ Project state management
+│   │   │   ├── ChatHistoryContext.jsx ✅ Chat history state
+│   │   │   └── AppContext.jsx          ✅ Language, role, theme state
+│   │   └── ...
+├── backend/
+│   └── main.py                         ✅ FastAPI backend with LLM integration
+└── data/
+    ├── materials.json                  ✅ Sample materials data
+    └── materials-pending-approval.json ✅ Demo project data
+
+# Future structure with Phase 1:
+├── frontend/src/pages/
+│   ├── CreateDevis.jsx                 📋 Planned: Devis creation
+└── projects/                           📋 Planned: Project data storage
+    ├── project-a/
+    │   ├── devis.json                  📋 Phase 1 data
+    │   └── materials.json               ✅ Phase 2 data
+    └── project-b/
+        └── ...
 ```
 
-## Getting Started (Phase 1 Dashboard)
+## Getting Started (Phase 2: Tracking Dashboard)
 
 ### Backend Setup (FastAPI)
 
@@ -233,12 +363,48 @@ france_renovation_contractor/
 - **Terminal 1**: Run FastAPI backend (`cd backend && uvicorn main:app --reload`)
 - **Terminal 2**: Run React frontend (`cd frontend && npm run dev`)
 
+## Implementation Status
+
+### ✅ Completed (Phase 2: Tracking)
+- **Global Dashboard MVP** ✅
+  - Project cards with status indicators and lifecycle management
+  - Project metrics (total projects, completion rate, client approvals, invoices, costs)
+  - Demo projects for testing and onboarding
+  - Settings page (language, role, theme preferences)
+  - Project selection and navigation
+- **Tracking Dashboard** with KPIs and metrics
+- **Materials tracking table** with editable fields
+- **LLM-powered assistant** for project queries
+  - Bilingual responses (generates both English and French)
+  - Language-aware display based on UI language toggle
+  - Chat history with language switching support
+- **Chat history** with conversation tracking
+  - Automatically cleared on logout/login for privacy
+  - Language-aware response display
+- **Role-based access** (Contractor, Client, Architect)
+- **Multi-language UI support** (French/English) with language toggle
+- **Theme support** (Purple/Blue themes)
+- **Backend API** for data management and LLM queries
+- **Real-time data updates**
+- **Protected routes** requiring project selection for tracking pages
+
+### 🚧 In Progress
+- Enhanced UI/UX improvements
+- Zulip chatbot integration (Phase 2.3)
+- Advanced task management features (Phase 2.4)
+
+### 📋 Planned (Creating Devis - Phase 1)
+- Devis creation interface (HEMEA-like)
+- Project creation workflow from global dashboard
+- Integration between Creating Devis and Tracking
+- Devis export functionality
+
 ## Notes
 
 - Focus on French apartment renovation context and requirements
 - Consider French construction regulations and standards
 - Ensure GDPR compliance for client data
-- Support multiple concurrent projects
+- Support multiple concurrent projects (architecture ready)
 - Design for scalability as more contractors/clients are added
-
-
+- Clear separation between Creating Devis and Tracking workflows
+- User-facing UI uses "Creating" and "Tracking" terminology; "Phase" terminology reserved for technical development planning

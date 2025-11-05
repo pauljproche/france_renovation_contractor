@@ -42,6 +42,11 @@ class MaterialsUpdate(BaseModel):
     materials: dict[str, Any]
 
 
+class TranslationRequest(BaseModel):
+    text: str
+    target_language: str
+
+
 @app.get("/")
 async def root():
     return {"message": "Renovation Contractor API", "status": "running"}
@@ -75,12 +80,16 @@ async def query_assistant(query: MaterialsQuery):
             materials_text = json.dumps(sections_summary, indent=2, ensure_ascii=False)
 
         system_prompt = (
-            "Tu es un assistant pour un chantier de rénovation. "
-            "Utilise strictement les données fournies pour répondre de manière concise en français. "
-            "Cite les sections pertinentes (ex. Cuisine, WC 1) quand nécessaire."
+            "You are an assistant for a renovation construction site. "
+            "Use strictly the provided data to respond concisely. "
+            "Cite relevant sections (e.g., Kitchen, WC 1) when necessary. "
+            "IMPORTANT: Always provide your response in BOTH English and French. "
+            "Format exactly as follows (no other text before or after):\n"
+            "EN: [Your English response here]\n"
+            "FR: [Your French response here]"
         )
 
-        user_content = f"Données matériaux:\n{materials_text}\n\nQuestion: {query.prompt}"
+        user_content = f"Materials data:\n{materials_text}\n\nQuestion: {query.prompt}"
 
         response = client.chat.completions.create(
             model=default_model,
@@ -95,12 +104,101 @@ async def query_assistant(query: MaterialsQuery):
         if not answer:
             raise HTTPException(status_code=500, detail="Empty response from OpenAI")
 
-        return {"answer": answer.strip()}
+        # Parse the response to extract English and French versions
+        answer_text = answer.strip()
+        english_answer = answer_text  # Default fallback
+        french_answer = answer_text   # Default fallback
+        
+        # Try to extract EN and FR versions
+        # Look for "EN:" and "FR:" markers
+        en_index = answer_text.find("EN:")
+        fr_index = answer_text.find("FR:")
+        
+        if en_index != -1 and fr_index != -1:
+            # Both markers found
+            if en_index < fr_index:
+                # Format: EN: ... FR: ...
+                english_part = answer_text[en_index + 3:fr_index].strip()
+                french_part = answer_text[fr_index + 3:].strip()
+            else:
+                # Format: FR: ... EN: ... (unusual but handle it)
+                french_part = answer_text[fr_index + 3:en_index].strip()
+                english_part = answer_text[en_index + 3:].strip()
+            
+            # Clean up whitespace
+            english_part = ' '.join(english_part.split())
+            french_part = ' '.join(french_part.split())
+            
+            if english_part:
+                english_answer = english_part
+            if french_part:
+                french_answer = french_part
+        elif en_index != -1:
+            # Only EN: found
+            english_part = answer_text[en_index + 3:].strip()
+            english_part = ' '.join(english_part.split())
+            if english_part:
+                english_answer = english_part
+                french_answer = english_part  # Fallback: use English for both
+        elif fr_index != -1:
+            # Only FR: found - this is a problem, but handle it
+            french_part = answer_text[fr_index + 3:].strip()
+            french_part = ' '.join(french_part.split())
+            if french_part:
+                french_answer = french_part
+                english_answer = french_part  # Fallback: use French for both (shouldn't happen)
+
+        return {
+            "answer": english_answer,
+            "answer_fr": french_answer
+        }
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Error querying assistant: {str(e)}"
+        )
+
+
+@app.post("/api/translate")
+async def translate_text(request: TranslationRequest):
+    """
+    Translate text from English to target language using OpenAI.
+    """
+    try:
+        if request.target_language == 'en':
+            return {"translated_text": request.text}
+        
+        # Map language codes to full names
+        language_map = {
+            'fr': 'French',
+            'es': 'Spanish',
+            'de': 'German',
+            # Add more as needed
+        }
+        target_lang_name = language_map.get(request.target_language, 'French')
+        
+        translation_prompt = f"Translate the following English text to {target_lang_name}. Only return the translation, no explanations:\n\n{request.text}"
+        
+        response = client.chat.completions.create(
+            model=default_model,
+            messages=[
+                {"role": "system", "content": f"You are a professional translator. Translate English text to {target_lang_name} accurately and naturally."},
+                {"role": "user", "content": translation_prompt}
+            ],
+            temperature=0.3
+        )
+        
+        translated_text = response.choices[0].message.content.strip()
+        if not translated_text:
+            raise HTTPException(status_code=500, detail="Empty translation from OpenAI")
+        
+        return {"translated_text": translated_text}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error translating text: {str(e)}"
         )
 
 

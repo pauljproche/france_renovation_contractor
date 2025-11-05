@@ -19,11 +19,15 @@ export async function queryMaterialsAssistant({ prompt, materials }) {
     }
 
     const result = await response.json();
-    const answer = result.answer;
-    if (!answer) {
-      throw new Error('Assistant returned an empty response.');
-    }
-    return answer;
+    // Return both English and French versions
+    // Ensure we have valid strings, defaulting to answer if answer_fr is missing
+    const enAnswer = result.answer || '';
+    const frAnswer = result.answer_fr || enAnswer || '';
+    
+    return {
+      en: enAnswer,
+      fr: frAnswer
+    };
   } catch (err) {
     if (err.message.includes('Failed to fetch')) {
       throw new Error('Cannot connect to backend API. Make sure the FastAPI server is running on port 8000.');

@@ -1,0 +1,344 @@
+{
+  "currency": "EUR",
+  "sections": [
+    {
+      "id": "bathroom-main",
+      "label": "Salle de bain principale",
+      "items": [
+        {
+          "product": "Baignoire balnéo Hansgrohe Raindance Select E 300",
+          "reference": "13223000",
+          "supplierLink": "https://www.reuter.com/fr/fr/hansgrohe-raindance-select-e-300-salle-de-bain-avec-pomme-de-douche-extra-large-300-mm-a213773.php",
+          "price": {
+            "ttc": 1845.50,
+            "htQuote": 1677.73
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": "Recommandé pour cette configuration",
+            "client": null
+          }
+        },
+        {
+          "product": "Mitigeur thermostatique Hansgrohe Raindance Select 300",
+          "reference": "13174000",
+          "supplierLink": "https://www.reuter.com/fr/fr/hansgrohe-raindance-select-300-mitigeur-thermostatique-mural-a213774.php",
+          "price": {
+            "ttc": 765.30,
+            "htQuote": 695.73
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Lavabo suspendu Villeroy & Boch Subway 2.0, 60 cm",
+          "reference": null,
+          "supplierLink": "https://www.reuter.com/fr/fr/villeroy-boch-subway-20-lavabo-suspendu-60-cm-a1186068.php",
+          "price": {
+            "ttc": 425.80,
+            "htQuote": 386.18
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Mitigeur de lavabo Hansgrohe Talis E",
+          "reference": null,
+          "supplierLink": "https://www.reuter.com/fr/fr/hansgrohe-talis-e-mitigeur-de-lavabo-avec-ecosmart-chrome-a1186069.php",
+          "price": {
+            "ttc": 285.40,
+            "htQuote": 259.45
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "bathroom-tiles",
+      "label": "Carrelage",
+      "items": [
+        {
+          "product": "Carrelage mural Cotto d'Este Urban, 60×120 cm, gris anthracite",
+          "reference": "URB-60x120-GR",
+          "supplierLink": null,
+          "price": {
+            "ttc": 89.50,
+            "htQuote": 81.36
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 45
+          },
+          "comments": {
+            "cray": "Surface totale: 27 m²",
+            "client": null
+          }
+        },
+        {
+          "product": "Carrelage sol Cotto d'Este Urban, 30×60 cm, gris anthracite",
+          "reference": "URB-30x60-GR",
+          "supplierLink": null,
+          "price": {
+            "ttc": 42.30,
+            "htQuote": 38.45
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 30
+          },
+          "comments": {
+            "cray": "Surface totale: 5.4 m²",
+            "client": null
+          }
+        },
+        {
+          "product": "Colle à carrelage Weber.tix C2, 20 kg",
+          "reference": null,
+          "supplierLink": null,
+          "price": {
+            "ttc": 18.90,
+            "htQuote": 17.18
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 8
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "bathroom-accessories",
+      "label": "Accessoires et finitions",
+      "items": [
+        {
+          "product": "Miroir LED Geberit Mirror, 80×60 cm",
+          "reference": null,
+          "supplierLink": "https://www.reuter.com/fr/fr/geberit-mirror-miroir-led-80-60-cm-a1186070.php",
+          "price": {
+            "ttc": 645.00,
+            "htQuote": 586.36
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Meuble de salle de bain suspendu Geberit Option, 120×45 cm, 3 portes",
+          "reference": null,
+          "supplierLink": "https://www.reuter.com/fr/fr/geberit-option-meuble-de-salle-de-bain-suspendu-120-45-cm-3-portes-a1186071.php",
+          "price": {
+            "ttc": 895.50,
+            "htQuote": 813.18
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        },
+        {
+          "product": "Radiateur sèche-serviettes électrique Zehnder, 1200W, 60×60 cm",
+          "reference": null,
+          "supplierLink": null,
+          "price": {
+            "ttc": 425.00,
+            "htQuote": 386.36
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": "approved",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
+        }
+      ]
+    }
+  ]
+}
+

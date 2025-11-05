@@ -30,8 +30,8 @@ export default function Landing() {
             {t('appTitle')}
           </Link>
           <nav className="landing-nav-links">
-            <Link to="/dashboard" className="landing-nav-link">
-              {t('navDashboard')}
+            <Link to="/global-dashboard" className="landing-nav-link">
+              {t('globalDashboardTitle')}
             </Link>
             <LanguageToggle />
           </nav>

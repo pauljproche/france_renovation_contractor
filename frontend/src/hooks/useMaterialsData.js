@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useProjects } from '../contexts/ProjectsContext.jsx';
 
 const DATA_ENDPOINT = '/materials.json';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -71,6 +72,7 @@ function computeMetrics(sections) {
 }
 
 export function useMaterialsData() {
+  const { selectedProject } = useProjects();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -79,10 +81,27 @@ export function useMaterialsData() {
     let isMounted = true;
 
     async function load() {
+      // If empty demo project is selected, return empty data
+      if (selectedProject?.id === 'empty-demo-project') {
+        if (isMounted) {
+          setData({ sections: [] });
+          setLoading(false);
+          setError('');
+        }
+        return;
+      }
+
+      // Determine which data file to load based on project
+      let dataEndpoint = DATA_ENDPOINT; // Default to materials.json
+      if (selectedProject?.id === 'pending-approval-demo-project') {
+        dataEndpoint = '/materials-pending-approval.json';
+      }
+
+      // Load project-specific data
       try {
-        const response = await fetch(DATA_ENDPOINT);
+        const response = await fetch(dataEndpoint);
         if (!response.ok) {
-          throw new Error(`Failed to load materials.json (${response.status})`);
+          throw new Error(`Failed to load materials data (${response.status})`);
         }
         const json = await response.json();
         if (isMounted) {
@@ -104,7 +123,7 @@ export function useMaterialsData() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [selectedProject]);
 
   const metrics = useMemo(() => {
     if (!data) {
@@ -115,6 +134,13 @@ export function useMaterialsData() {
 
   const updateMaterials = async (newData) => {
     setError('');
+    
+    // Don't allow updating demo projects
+    if (selectedProject?.id === 'empty-demo-project' || selectedProject?.id === 'pending-approval-demo-project') {
+      setError('Cannot update demo project');
+      return { success: false, error: 'Cannot update demo project' };
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/materials`, {
         method: 'PUT',

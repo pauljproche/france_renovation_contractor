@@ -1,5 +1,6 @@
 import { useChatHistory } from '../contexts/ChatHistoryContext.jsx';
 import { useTranslation } from '../hooks/useTranslation.js';
+import { useLanguage } from '../contexts/AppContext.jsx';
 
 function formatTimestamp(date) {
   const d = new Date(date);
@@ -18,6 +19,7 @@ function formatTimestamp(date) {
 function ChatHistory() {
   const { history, clearHistory } = useChatHistory();
   const { t } = useTranslation();
+  const { language } = useLanguage();
 
   return (
     <>
@@ -62,7 +64,22 @@ function ChatHistory() {
               ) : (
                 <div className="chat-response">
                   <div className="chat-label">{t('response')}:</div>
-                  <div className="chat-content">{entry.response}</div>
+                  <div className="chat-content">
+                    {(() => {
+                      // Handle both old format (string) and new format (object with en/fr)
+                      if (typeof entry.response === 'object' && entry.response !== null) {
+                        // New format: object with en and fr
+                        if (language === 'en') {
+                          return entry.response.en || entry.response.fr || '';
+                        } else {
+                          return entry.response.fr || entry.response.en || '';
+                        }
+                      } else {
+                        // Old format: just a string (fallback)
+                        return entry.response || '';
+                      }
+                    })()}
+                  </div>
                 </div>
               )}
             </div>
@@ -74,5 +91,6 @@ function ChatHistory() {
 }
 
 export default ChatHistory;
+
 
 

@@ -1,19 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { queryMaterialsAssistant } from '../services/assistant.js';
 import { useTranslation } from '../hooks/useTranslation.js';
+import { useLanguage } from '../contexts/AppContext.jsx';
 import { useChatHistory } from '../contexts/ChatHistoryContext.jsx';
 import { useAIPanel } from '../contexts/AppContext.jsx';
 import { useMaterialsData } from '../hooks/useMaterialsData.js';
 
 function AIPanel() {
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const { addEntry } = useChatHistory();
   const { isAIPanelOpen } = useAIPanel();
   const { data: materials } = useMaterialsData();
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
-  const [response, setResponse] = useState('');
-  const [error, setError] = useState('');
+  const [chatMessages, setChatMessages] = useState([]); // Store all chat messages with both EN and FR
   const contentRef = useRef(null);
 
   const handleSubmit = async (event) => {
@@ -23,23 +24,35 @@ function AIPanel() {
     }
 
     const userPrompt = prompt.trim();
+    const userMessage = { type: 'user', content: userPrompt };
+    
+    // Add user message immediately
+    setChatMessages(prev => [...prev, userMessage]);
+    setPrompt(''); // Clear the input
     setLoading(true);
-    setError('');
-    setResponse('');
 
     try {
       const answer = await queryMaterialsAssistant({ prompt: userPrompt, materials });
-      setResponse(answer);
-      setPrompt(''); // Clear the input after successful submission
+      // answer is now an object with { en, fr }
+      const assistantMessage = { 
+        type: 'assistant', 
+        content: answer // Store both en and fr
+      };
       
-      // Save to chat history
+      // Add assistant response
+      setChatMessages(prev => [...prev, assistantMessage]);
+      
+      // Save to chat history (for Chat History page) - save both languages
       addEntry({
         prompt: userPrompt,
-        response: answer,
+        response: answer, // Save both en and fr
       });
     } catch (err) {
       const errorMessage = err.message || t('assistantError');
-      setError(errorMessage);
+      const errorMessageObj = { type: 'error', content: errorMessage };
+      
+      // Add error message
+      setChatMessages(prev => [...prev, errorMessageObj]);
       
       // Save error to chat history too
       addEntry({
@@ -52,40 +65,82 @@ function AIPanel() {
     }
   };
 
-  // Auto-scroll to bottom when response is received
+  const handleClear = () => {
+    setChatMessages([]);
+  };
+
+  // Auto-scroll to bottom when new messages are added
   useEffect(() => {
-    if (response && contentRef.current) {
+    if (contentRef.current) {
       contentRef.current.scrollTop = contentRef.current.scrollHeight;
     }
-  }, [response]);
+  }, [chatMessages, loading]);
 
   return (
     <aside className={`ai-panel ${!isAIPanelOpen ? 'ai-panel-hidden' : ''}`}>
       <div className="ai-panel-header">
         <h3>{t('assistantLabel') || 'Assistant IA'}</h3>
+        {chatMessages.length > 0 && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className="ai-panel-clear-btn"
+            title={t('clearChat') || 'Clear chat'}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        )}
       </div>
       <div className="ai-panel-content" ref={contentRef}>
-        {!response && !error && !loading && (
+        {chatMessages.length === 0 && !loading && (
           <div className="ai-panel-welcome">
             <p>{t('assistantWelcome')}</p>
           </div>
         )}
+        {chatMessages.map((message, index) => (
+          <div key={index} className={`ai-panel-message ai-panel-message-${message.type}`}>
+            {message.type === 'user' && (
+              <div className="ai-panel-user-message">
+                <div className="ai-panel-message-label">{t('you') || 'You'}</div>
+                <div className="ai-panel-message-content">{message.content}</div>
+              </div>
+            )}
+            {message.type === 'assistant' && (
+              <div className="ai-panel-response">
+                <div className="ai-response-header">
+                  <span className="ai-response-label">{t('response') || 'Response'}</span>
+                </div>
+                <div className="ai-response-content">
+                  {(() => {
+                    // Handle both old format (string) and new format (object with en/fr)
+                    if (typeof message.content === 'object' && message.content !== null) {
+                      // New format: object with en and fr
+                      if (language === 'en') {
+                        return message.content.en || message.content.fr || '';
+                      } else {
+                        return message.content.fr || message.content.en || '';
+                      }
+                    } else {
+                      // Old format: just a string (fallback)
+                      return message.content || '';
+                    }
+                  })()}
+                </div>
+              </div>
+            )}
+            {message.type === 'error' && (
+              <div className="ai-panel-error">
+                <span className="warning">{message.content}</span>
+              </div>
+            )}
+          </div>
+        ))}
         {loading && (
           <div className="ai-panel-loading">
             <span className="loader">{t('asking') || 'Envoi...'}</span>
-          </div>
-        )}
-        {response && (
-          <div className="ai-panel-response">
-            <div className="ai-response-header">
-              <span className="ai-response-label">{t('response')}</span>
-            </div>
-            <div className="ai-response-content">{response}</div>
-          </div>
-        )}
-        {error && (
-          <div className="ai-panel-error">
-            <span className="warning">{error}</span>
           </div>
         )}
       </div>

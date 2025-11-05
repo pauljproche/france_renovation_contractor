@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 // Language Context
 const LanguageContext = createContext(undefined);
@@ -90,6 +90,49 @@ export function useAIPanel() {
   const context = useContext(AIPanelContext);
   if (context === undefined) {
     throw new Error('useAIPanel must be used within AIPanelProvider');
+  }
+  return context;
+}
+
+// Theme Context
+const ThemeContext = createContext(undefined);
+
+export const THEMES = {
+  PURPLE: 'purple',
+  BLUE: 'blue'
+};
+
+export function ThemeProvider({ children }) {
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('theme');
+    return saved || THEMES.PURPLE; // Default to purple
+  });
+
+  const setThemeAndSave = (newTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    // Apply theme class to body
+    document.body.className = document.body.className.replace(/theme-\w+/g, '');
+    document.body.classList.add(`theme-${newTheme}`);
+  };
+
+  // Apply theme on mount
+  useEffect(() => {
+    document.body.className = document.body.className.replace(/theme-\w+/g, '');
+    document.body.classList.add(`theme-${theme}`);
+  }, [theme]);
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme: setThemeAndSave }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+export function useTheme() {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useTheme must be used within ThemeProvider');
   }
   return context;
 }
