@@ -363,6 +363,12 @@ france_renovation_contractor/
 - **Terminal 1**: Run FastAPI backend (`cd backend && uvicorn main:app --reload`)
 - **Terminal 2**: Run React frontend (`cd frontend && npm run dev`)
 
+### Assistant-Powered Table Edits & Reloading
+
+- The LLM assistant can now edit `data/materials.json` directly by calling the backend `update_cell` function. When the assistant responds with a successful update, the Materials table automatically refreshes via a shared `materials-data-reload` event so every visible view stays in sync.
+- The Materials page header includes a **Reload data** button for manual refreshes. This forces the React hook to re-fetch `/materials.json` (with cache busting) in case you made changes outside the assistant or while experimenting with data files.
+- Any component that needs fresh materials can call the exported `reload()` helper from `useMaterialsData`. It triggers a local refetch and broadcasts the reload event so other mounts update themselves without a full page reload.
+
 ## Implementation Status
 
 ### ✅ Completed (Phase 2: Tracking)

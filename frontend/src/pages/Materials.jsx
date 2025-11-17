@@ -2,11 +2,15 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useAIPanel } from '../contexts/AppContext.jsx';
 import EditableMaterialsTable from '../components/EditableMaterialsTable.jsx';
+import { MATERIALS_RELOAD_EVENT } from '../hooks/useMaterialsData.js';
 
 function Materials() {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const { setIsAIPanelOpen } = useAIPanel();
+  const handleReload = () => {
+    window.dispatchEvent(new CustomEvent(MATERIALS_RELOAD_EVENT));
+  };
 
   // Open AI panel when navigating from project page
   useEffect(() => {
@@ -33,6 +37,13 @@ function Materials() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
+        <button
+          type="button"
+          className="table-toolbar-reload"
+          onClick={handleReload}
+        >
+          {t('reloadData') || 'Reload data'}
+        </button>
       </div>
 
       <EditableMaterialsTable search={search} />

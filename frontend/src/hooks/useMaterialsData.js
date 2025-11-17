@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useProjects } from '../contexts/ProjectsContext.jsx';
 
 const DATA_ENDPOINT = '/materials.json';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+export const MATERIALS_RELOAD_EVENT = 'materials-data-reload';
 
 function normalizeMoney(value) {
   if (typeof value === 'number') {
@@ -76,30 +77,60 @@ export function useMaterialsData() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  const instanceIdRef = useRef(null);
+
+  if (!instanceIdRef.current) {
+    instanceIdRef.current = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  const reload = useCallback(({ broadcast = true } = {}) => {
+    setReloadKey((key) => key + 1);
+    if (broadcast) {
+      window.dispatchEvent(new CustomEvent(MATERIALS_RELOAD_EVENT, {
+        detail: { sourceId: instanceIdRef.current }
+      }));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleReloadEvent = (event) => {
+      if (event.detail?.sourceId === instanceIdRef.current) {
+        return;
+      }
+      reload({ broadcast: false });
+    };
+
+    window.addEventListener(MATERIALS_RELOAD_EVENT, handleReloadEvent);
+    return () => {
+      window.removeEventListener(MATERIALS_RELOAD_EVENT, handleReloadEvent);
+    };
+  }, [reload]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function load() {
-      // If empty demo project is selected, return empty data
+      setLoading(true);
+      setError('');
+
       if (selectedProject?.id === 'empty-demo-project') {
         if (isMounted) {
           setData({ sections: [] });
           setLoading(false);
-          setError('');
         }
         return;
       }
 
-      // Determine which data file to load based on project
-      let dataEndpoint = DATA_ENDPOINT; // Default to materials.json
+      let dataEndpoint = DATA_ENDPOINT;
       if (selectedProject?.id === 'pending-approval-demo-project') {
         dataEndpoint = '/materials-pending-approval.json';
       }
 
-      // Load project-specific data
       try {
-        const response = await fetch(dataEndpoint);
+        const response = await fetch(`${dataEndpoint}?ts=${Date.now()}`, {
+          cache: 'no-store'
+        });
         if (!response.ok) {
           throw new Error(`Failed to load materials data (${response.status})`);
         }
@@ -123,7 +154,7 @@ export function useMaterialsData() {
     return () => {
       isMounted = false;
     };
-  }, [selectedProject]);
+  }, [selectedProject, reloadKey]);
 
   const metrics = useMemo(() => {
     if (!data) {
@@ -156,12 +187,17 @@ export function useMaterialsData() {
       }
 
       // Reload data from the server
-      const response_data = await fetch(DATA_ENDPOINT);
+      const response_data = await fetch(`${DATA_ENDPOINT}?ts=${Date.now()}`, {
+        cache: 'no-store'
+      });
       if (!response_data.ok) {
         throw new Error(`Failed to reload materials (${response_data.status})`);
       }
       const json = await response_data.json();
       setData(json);
+      window.dispatchEvent(new CustomEvent(MATERIALS_RELOAD_EVENT, {
+        detail: { sourceId: instanceIdRef.current }
+      }));
       
       return { success: true };
     } catch (err) {
@@ -171,7 +207,7 @@ export function useMaterialsData() {
     }
   };
 
-  return { data, loading, error, metrics, updateMaterials };
+  return { data, loading, error, metrics, updateMaterials, reload };
 }
 
 export function formatCurrency(amount, locale = 'fr-FR') {

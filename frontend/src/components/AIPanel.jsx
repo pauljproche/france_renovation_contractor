@@ -4,7 +4,8 @@ import { useTranslation } from '../hooks/useTranslation.js';
 import { useLanguage } from '../contexts/AppContext.jsx';
 import { useChatHistory } from '../contexts/ChatHistoryContext.jsx';
 import { useAIPanel } from '../contexts/AppContext.jsx';
-import { useMaterialsData } from '../hooks/useMaterialsData.js';
+import { useMaterialsData, MATERIALS_RELOAD_EVENT } from '../hooks/useMaterialsData.js';
+import { useCustomTable } from '../contexts/CustomTableContext.jsx';
 
 function AIPanel() {
   const { t } = useTranslation();
@@ -12,6 +13,7 @@ function AIPanel() {
   const { addEntry } = useChatHistory();
   const { isAIPanelOpen } = useAIPanel();
   const { data: materials } = useMaterialsData();
+  const { customTables } = useCustomTable();
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState([]); // Store all chat messages with both EN and FR
@@ -32,7 +34,11 @@ function AIPanel() {
     setLoading(true);
 
     try {
-      const answer = await queryMaterialsAssistant({ prompt: userPrompt, materials });
+      const answer = await queryMaterialsAssistant({ 
+        prompt: userPrompt, 
+        materials,
+        customTables: customTables.length > 0 ? customTables : undefined
+      });
       // answer is now an object with { en, fr }
       const assistantMessage = { 
         type: 'assistant', 
@@ -41,6 +47,13 @@ function AIPanel() {
       
       // Add assistant response
       setChatMessages(prev => [...prev, assistantMessage]);
+
+      const updatePattern = /(successfully updated|has been updated|mis à jour|a été mis à jour)/i;
+      const englishText = answer?.en || '';
+      const frenchText = answer?.fr || '';
+      if (updatePattern.test(englishText) || updatePattern.test(frenchText)) {
+        window.dispatchEvent(new CustomEvent(MATERIALS_RELOAD_EVENT));
+      }
       
       // Save to chat history (for Chat History page) - save both languages
       addEntry({
