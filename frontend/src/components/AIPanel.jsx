@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { queryMaterialsAssistant } from '../services/assistant.js';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useLanguage } from '../contexts/AppContext.jsx';
@@ -7,6 +8,107 @@ import { useAIPanel } from '../contexts/AppContext.jsx';
 import { useMaterialsData, MATERIALS_RELOAD_EVENT } from '../hooks/useMaterialsData.js';
 import { useCustomTable } from '../contexts/CustomTableContext.jsx';
 
+// Storage key for AI panel chat sessions
+const getAIPanelSessionsKey = () => {
+  const username = sessionStorage.getItem('username');
+  return username ? `ai-panel-sessions-${username}` : 'ai-panel-sessions-guest';
+};
+
+// Storage key for current session ID
+const getCurrentSessionIdKey = () => {
+  const username = sessionStorage.getItem('username');
+  return username ? `ai-panel-current-session-${username}` : 'ai-panel-current-session-guest';
+};
+
+// Load all chat sessions from localStorage
+const loadAIPanelSessions = () => {
+  try {
+    const key = getAIPanelSessionsKey();
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.warn('Failed to load AI panel sessions:', e);
+  }
+  return {};
+};
+
+// Save all chat sessions to localStorage
+const saveAIPanelSessions = (sessions) => {
+  try {
+    const key = getAIPanelSessionsKey();
+    localStorage.setItem(key, JSON.stringify(sessions));
+  } catch (e) {
+    console.warn('Failed to save AI panel sessions:', e);
+  }
+};
+
+// Get current session ID
+const getCurrentSessionId = () => {
+  try {
+    const key = getCurrentSessionIdKey();
+    return sessionStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+};
+
+// Set current session ID
+const setCurrentSessionId = (sessionId) => {
+  try {
+    const key = getCurrentSessionIdKey();
+    if (sessionId) {
+      sessionStorage.setItem(key, sessionId);
+    } else {
+      sessionStorage.removeItem(key);
+    }
+  } catch (e) {
+    console.warn('Failed to set current session ID:', e);
+  }
+};
+
+// Create a new session
+const createNewSession = () => {
+  const sessionId = crypto.randomUUID();
+  const now = new Date();
+  return {
+    id: sessionId,
+    createdAt: now.toISOString(),
+    messages: []
+  };
+};
+
+// Save current session
+const saveCurrentSession = (messages) => {
+  if (messages.length === 0) return; // Don't save empty sessions
+  
+  const sessionId = getCurrentSessionId();
+  if (!sessionId) return;
+  
+  const sessions = loadAIPanelSessions();
+  sessions[sessionId] = {
+    id: sessionId,
+    createdAt: sessions[sessionId]?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    messages: messages
+  };
+  saveAIPanelSessions(sessions);
+};
+
+// Load a specific session
+const loadSession = (sessionId) => {
+  const sessions = loadAIPanelSessions();
+  return sessions[sessionId]?.messages || [];
+};
+
+// Delete a session
+const deleteSession = (sessionId) => {
+  const sessions = loadAIPanelSessions();
+  delete sessions[sessionId];
+  saveAIPanelSessions(sessions);
+};
+
 function AIPanel() {
   const { t } = useTranslation();
   const { language } = useLanguage();
@@ -14,15 +116,132 @@ function AIPanel() {
   const { isAIPanelOpen } = useAIPanel();
   const { data: materials } = useMaterialsData();
   const { customTables } = useCustomTable();
+  const location = useLocation();
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]); // Store all chat messages with both EN and FR
+  // Start with no session - session will be created when first question is asked
+  const [currentSessionId, setCurrentSessionIdState] = useState(() => {
+    // Don't load existing session - always start fresh
+    return null;
+  });
+  
+  const [chatMessages, setChatMessages] = useState(() => {
+    // Always start with empty messages
+    return [];
+  });
+  
+  const [sessions, setSessions] = useState(() => loadAIPanelSessions());
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const contentRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  // Save current session messages whenever they change (if session exists)
+  useEffect(() => {
+    if (currentSessionId && chatMessages.length > 0) {
+      saveCurrentSession(chatMessages);
+      setSessions(loadAIPanelSessions());
+    }
+  }, [chatMessages, currentSessionId]);
+
+  // End session when messages become empty (but only if we're not loading a session)
+  useEffect(() => {
+    if (chatMessages.length === 0 && currentSessionId) {
+      // Check if this session actually has messages saved
+      const sessions = loadAIPanelSessions();
+      const session = sessions[currentSessionId];
+      // Only end session if it doesn't have saved messages (truly empty)
+      if (!session || !session.messages || session.messages.length === 0) {
+        setCurrentSessionId(null);
+        setCurrentSessionIdState(null);
+        setSessions(loadAIPanelSessions());
+      }
+    }
+  }, [chatMessages.length, currentSessionId]);
+
+  // Save current session and clear when navigating away from tracking pages
+  useEffect(() => {
+    const isTrackingPage = !['/global-dashboard', '/settings', '/'].includes(location.pathname);
+    if (!isTrackingPage) {
+      // Save current session before clearing
+      if (chatMessages.length > 0 && currentSessionId) {
+        saveCurrentSession(chatMessages);
+      }
+      // Clear session and messages
+      setCurrentSessionId(null);
+      setCurrentSessionIdState(null);
+      setChatMessages([]);
+      setSessions(loadAIPanelSessions());
+    }
+  }, [location.pathname]); // Only run when pathname changes
+
+  // Save session when AI panel closes or component unmounts
+  useEffect(() => {
+    if (!isAIPanelOpen && chatMessages.length > 0 && currentSessionId) {
+      // Save session when panel closes
+      saveCurrentSession(chatMessages);
+      setSessions(loadAIPanelSessions());
+    }
+  }, [isAIPanelOpen, chatMessages, currentSessionId]);
+
+  // Save session on component unmount (e.g., on logout)
+  useEffect(() => {
+    return () => {
+      // Save current session when component unmounts
+      if (chatMessages.length > 0 && currentSessionId) {
+        saveCurrentSession(chatMessages);
+      }
+    };
+  }, [chatMessages, currentSessionId]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowSessionDropdown(false);
+      }
+    };
+    
+    if (showSessionDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSessionDropdown]);
+
+  // Listen for use-prompt-from-library event
+  useEffect(() => {
+    const handleUsePrompt = (event) => {
+      const { prompt } = event.detail;
+      if (prompt) {
+        setPrompt(prompt);
+        // Focus the textarea
+        const textarea = document.querySelector('.ai-panel-form textarea');
+        if (textarea) {
+          textarea.focus();
+        }
+      }
+    };
+
+    window.addEventListener('use-prompt-from-library', handleUsePrompt);
+    return () => {
+      window.removeEventListener('use-prompt-from-library', handleUsePrompt);
+    };
+  }, []);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!prompt.trim()) {
       return;
+    }
+
+    // Create new session if this is the first message
+    if (!currentSessionId && chatMessages.length === 0) {
+      const newSession = createNewSession();
+      const sessionId = newSession.id;
+      setCurrentSessionId(sessionId);
+      setCurrentSessionIdState(sessionId);
     }
 
     const userPrompt = prompt.trim();
@@ -59,6 +278,7 @@ function AIPanel() {
       addEntry({
         prompt: userPrompt,
         response: answer, // Save both en and fr
+        sessionId: currentSessionId || undefined
       });
     } catch (err) {
       const errorMessage = err.message || t('assistantError');
@@ -72,6 +292,7 @@ function AIPanel() {
         prompt: userPrompt,
         response: '',
         error: errorMessage,
+        sessionId: currentSessionId || undefined
       });
     } finally {
       setLoading(false);
@@ -79,7 +300,74 @@ function AIPanel() {
   };
 
   const handleClear = () => {
+    // Save current session before clearing
+    if (chatMessages.length > 0 && currentSessionId) {
+      saveCurrentSession(chatMessages);
+    }
+    // Clear messages (this will trigger the effect to end the session)
     setChatMessages([]);
+    setSessions(loadAIPanelSessions());
+  };
+
+  const handleSelectSession = (sessionId) => {
+    // Save current session before switching
+    if (chatMessages.length > 0 && currentSessionId && currentSessionId !== sessionId) {
+      saveCurrentSession(chatMessages);
+    }
+    // Load selected session
+    const messages = loadSession(sessionId);
+    // Set session ID first, then messages to avoid triggering the "end session" effect
+    setCurrentSessionId(sessionId);
+    setCurrentSessionIdState(sessionId);
+    setChatMessages(messages || []);
+    setShowSessionDropdown(false);
+    setSessions(loadAIPanelSessions());
+  };
+
+  const handleDeleteSession = (sessionId, e) => {
+    e.stopPropagation();
+    if (window.confirm(t('confirmDeleteSession') || 'Are you sure you want to delete this session?')) {
+      deleteSession(sessionId);
+      setSessions(loadAIPanelSessions());
+      // If deleting current session, start a new one
+      if (sessionId === currentSessionId) {
+        const newSession = createNewSession();
+        setCurrentSessionId(newSession.id);
+        setCurrentSessionIdState(newSession.id);
+        setChatMessages([]);
+      }
+    }
+  };
+
+  const handleNewSession = (e) => {
+    e.stopPropagation(); // Prevent dropdown from closing
+    // Save current session before creating new one
+    if (chatMessages.length > 0 && currentSessionId) {
+      saveCurrentSession(chatMessages);
+    }
+    // Clear current session and messages (new session will be created on first question)
+    setCurrentSessionId(null);
+    setCurrentSessionIdState(null);
+    setChatMessages([]);
+    setShowSessionDropdown(false);
+    setSessions(loadAIPanelSessions());
+  };
+
+  // Get sorted sessions (newest first)
+  const sortedSessions = Object.values(sessions).sort((a, b) => {
+    const dateA = new Date(a.updatedAt || a.createdAt);
+    const dateB = new Date(b.updatedAt || b.createdAt);
+    return dateB - dateA;
+  });
+
+  const formatSessionDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString(language === 'fr' ? 'fr-FR' : 'en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   // Auto-scroll to bottom when new messages are added
@@ -92,7 +380,116 @@ function AIPanel() {
   return (
     <aside className={`ai-panel ${!isAIPanelOpen ? 'ai-panel-hidden' : ''}`}>
       <div className="ai-panel-header">
-        <h3>{t('assistantLabel') || 'Assistant IA'}</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+          <h3>{t('assistantLabel') || 'Assistant IA'}</h3>
+          <div style={{ position: 'relative' }} ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setShowSessionDropdown(!showSessionDropdown)}
+              className="ai-panel-session-btn"
+              title={t('chatSessions') || 'Chat Sessions'}
+              style={{
+                padding: '4px 8px',
+                fontSize: '0.75rem',
+                background: '#3b82f6',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              {t('sessions') || 'Sessions'} ▼
+            </button>
+            {showSessionDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '4px',
+                background: '#fff',
+                border: '1px solid #e5e7eb',
+                borderRadius: '4px',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                zIndex: 1000,
+                minWidth: '200px',
+                maxWidth: '300px',
+                maxHeight: '300px',
+                overflowY: 'auto'
+              }}>
+                <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
+                  <button
+                    type="button"
+                    onClick={handleNewSession}
+                    style={{
+                      width: '100%',
+                      padding: '6px 12px',
+                      background: '#10b981',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    + {t('newSession') || 'New Session'}
+                  </button>
+                </div>
+                {sortedSessions.length === 0 ? (
+                  <div style={{ padding: '12px', color: '#6b7280', fontSize: '0.75rem', textAlign: 'center' }}>
+                    {t('noSessions') || 'No saved sessions'}
+                  </div>
+                ) : (
+                  sortedSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectSession(session.id);
+                      }}
+                      style={{
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #f3f4f6',
+                        background: session.id === currentSessionId ? '#eff6ff' : '#fff',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = session.id === currentSessionId ? '#dbeafe' : '#f9fafb'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = session.id === currentSessionId ? '#eff6ff' : '#fff'}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: session.id === currentSessionId ? 'bold' : 'normal', color: '#1f2937' }}>
+                          {formatSessionDate(session.updatedAt || session.createdAt)}
+                        </div>
+                        <div style={{ fontSize: '0.625rem', color: '#6b7280', marginTop: '2px' }}>
+                          {session.messages?.length || 0} {t('messages') || 'messages'}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteSession(session.id, e)}
+                        style={{
+                          padding: '2px 6px',
+                          fontSize: '0.625rem',
+                          background: '#ef4444',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '2px',
+                          cursor: 'pointer'
+                        }}
+                        title={t('deleteSession') || 'Delete session'}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
         {chatMessages.length > 0 && (
           <button
             type="button"

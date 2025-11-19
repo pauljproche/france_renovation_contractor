@@ -6,7 +6,8 @@ import os
 import json
 import re
 import httpx
-from typing import Optional, Any, Tuple
+from typing import Optional, Any, Tuple, List
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,6 +15,7 @@ load_dotenv()
 # Path to materials.json
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MATERIALS_FILE_PATH = os.path.join(BASE_DIR, '..', 'data', 'materials.json')
+EDIT_HISTORY_FILE_PATH = os.path.join(BASE_DIR, '..', 'data', 'edit-history.json')
 
 app = FastAPI(title="Renovation Contractor API")
 
@@ -46,6 +48,45 @@ def write_materials_data(data: dict) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def load_edit_history() -> List[dict]:
+    """Load edit history from file."""
+    if not os.path.exists(EDIT_HISTORY_FILE_PATH):
+        return []
+    try:
+        with open(EDIT_HISTORY_FILE_PATH, encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return []
+
+
+def save_edit_history(history: List[dict]) -> None:
+    """Save edit history to file."""
+    with open(EDIT_HISTORY_FILE_PATH, 'w', encoding='utf-8') as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+
+
+def log_edit(section_id: str, section_label: str, item_index: int, product: str, 
+             field_path: str, old_value: Any, new_value: Any, source: str = "manual") -> None:
+    """Log an edit to the history."""
+    history = load_edit_history()
+    edit_entry = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "section_id": section_id,
+        "section_label": section_label,
+        "item_index": item_index,
+        "product": product or "(empty product)",
+        "field_path": field_path,
+        "old_value": old_value,
+        "new_value": new_value,
+        "source": source  # "manual" or "agent"
+    }
+    history.append(edit_entry)
+    # Keep only last 1000 entries
+    if len(history) > 1000:
+        history = history[-1000:]
+    save_edit_history(history)
+
+
 def set_nested_value(target: dict, field_path: str, value: Any) -> None:
     parts = field_path.split('.')
     current = target
@@ -75,7 +116,18 @@ def match_section(sections: list[dict], identifier: str) -> Optional[dict]:
     return None
 
 
-def update_cell(section_id: str, item_index: int, field_path: str, new_value: Any) -> Tuple[dict, dict]:
+def get_nested_value(target: dict, field_path: str) -> Any:
+    """Get a nested value from a dict using dot notation."""
+    parts = field_path.split('.')
+    current = target
+    for part in parts:
+        if not isinstance(current, dict) or part not in current:
+            return None
+        current = current[part]
+    return current
+
+
+def update_cell(section_id: str, item_index: int, field_path: str, new_value: Any, source: str = "agent") -> Tuple[dict, dict]:
     data = load_materials_data()
     sections = data.get('sections', [])
     section = match_section(sections, section_id)
@@ -85,8 +137,19 @@ def update_cell(section_id: str, item_index: int, field_path: str, new_value: An
     if item_index < 0 or item_index >= len(items):
         raise ValueError(f"Item index {item_index} is out of bounds for section '{section_id}'.")
     item = items[item_index]
+    
+    # Get old value before updating
+    old_value = get_nested_value(item, field_path)
+    
+    # Update the value
     set_nested_value(item, field_path, new_value)
     write_materials_data(data)
+    
+    # Log the edit
+    product = item.get('product', '')
+    section_label = section.get('label', section_id)
+    log_edit(section_id, section_label, item_index, product, field_path, old_value, new_value, source)
+    
     return data, item
 
 
@@ -108,6 +171,17 @@ class TranslationRequest(BaseModel):
 class ImageExtractionRequest(BaseModel):
     url: str
     reference: Optional[str] = None
+
+
+class EditLogRequest(BaseModel):
+    section_id: str
+    section_label: str
+    item_index: int
+    product: str
+    field_path: str
+    old_value: Any
+    new_value: Any
+    source: str = "manual"
 
 
 @app.get("/")
@@ -543,6 +617,49 @@ async def update_materials(update: MaterialsUpdate):
         raise HTTPException(
             status_code=500,
             detail=f"Error updating materials: {str(e)}"
+        )
+
+
+@app.post("/api/edit-history/log")
+async def log_edit_entry(edit_log: EditLogRequest):
+    """
+    Log an edit to the edit history.
+    """
+    try:
+        log_edit(
+            section_id=edit_log.section_id,
+            section_label=edit_log.section_label,
+            item_index=edit_log.item_index,
+            product=edit_log.product,
+            field_path=edit_log.field_path,
+            old_value=edit_log.old_value,
+            new_value=edit_log.new_value,
+            source=edit_log.source
+        )
+        return {"message": "Edit logged successfully", "status": "ok"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error logging edit: {str(e)}"
+        )
+
+
+@app.get("/api/edit-history")
+async def get_edit_history(limit: Optional[int] = 100):
+    """
+    Get edit history, optionally limited to the most recent entries.
+    """
+    try:
+        history = load_edit_history()
+        # Return most recent entries first
+        history.reverse()
+        if limit and limit > 0:
+            history = history[:limit]
+        return {"history": history, "count": len(history)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving edit history: {str(e)}"
         )
 
 

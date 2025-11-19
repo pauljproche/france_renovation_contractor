@@ -1,0 +1,46 @@
+[
+  {
+    "timestamp": "2025-11-18T19:19:19.595230Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 2,
+    "product": "Suspension Estiluz Volta (T-3536-W, noir, LED 2700K, 3×565 lm, 86.7×54.3 cm)",
+    "field_path": "reference",
+    "old_value": null,
+    "new_value": "oiuiyutyiu",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-11-18T19:31:57.017302Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 4,
+    "product": "beegcat",
+    "field_path": "product",
+    "old_value": "",
+    "new_value": "beegcat",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-11-18T19:36:49.382931Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 4,
+    "product": "beegcat",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "pending",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-11-18T19:37:46.694929Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 4,
+    "product": "beegcat",
+    "field_path": "approvals.client.status",
+    "old_value": "pending",
+    "new_value": "rejected",
+    "source": "manual"
+  }
+]

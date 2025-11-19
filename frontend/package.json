@@ -10,6 +10,8 @@
     "lint:data": "node ../scripts/validateMaterials.js"
   },
   "dependencies": {
+    "jspdf": "^3.0.3",
+    "jspdf-autotable": "^5.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.23.1"
@@ -19,6 +21,4 @@
     "vite": "^5.2.0"
   }
 }
-
-
 

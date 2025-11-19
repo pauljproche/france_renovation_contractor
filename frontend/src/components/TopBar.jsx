@@ -3,7 +3,6 @@ import { useRole, ROLES, useLanguage, useAIPanel } from '../contexts/AppContext.
 import { useProjects } from '../contexts/ProjectsContext.jsx';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { useChatHistory } from '../contexts/ChatHistoryContext.jsx';
 
 function RoleSwitcher() {
   const { role, setRole } = useRole();
@@ -92,13 +91,26 @@ export default function TopBar() {
     };
   }, [showProfileMenu]);
   
-  const { clearHistory } = useChatHistory();
-  
   const handleLogout = () => {
+    // Get username before removing it
+    const username = sessionStorage.getItem('username');
+    // Save current AI panel session before logout
+    try {
+      const sessionsKey = username ? `ai-panel-sessions-${username}` : 'ai-panel-sessions-guest';
+      const currentSessionKey = username ? `ai-panel-current-session-${username}` : 'ai-panel-current-session-guest';
+      const sessionId = sessionStorage.getItem(currentSessionKey);
+      
+      // The session will be saved automatically when component unmounts
+      // But we'll clear the current session ID so a new one starts on next login
+      sessionStorage.removeItem(currentSessionKey);
+    } catch (e) {
+      // Ignore errors
+    }
     sessionStorage.removeItem('authenticated');
     sessionStorage.removeItem('username');
     localStorage.removeItem('aiPanelOpen');
-    clearHistory(); // Clear chat history on logout
+    // Don't clear chat history on logout - it's user-specific and persists
+    // Sessions are also preserved per user
     navigate('/');
   };
 

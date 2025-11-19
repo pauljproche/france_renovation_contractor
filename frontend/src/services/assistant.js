@@ -1,6 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-export async function queryMaterialsAssistant({ prompt, materials }) {
+export async function queryMaterialsAssistant({ prompt, materials, customTables }) {
   try {
     const response = await fetch(`${API_BASE_URL}/api/assistant/query`, {
       method: 'POST',
@@ -9,7 +9,8 @@ export async function queryMaterialsAssistant({ prompt, materials }) {
       },
       body: JSON.stringify({
         prompt,
-        materials
+        materials,
+        customTables
       })
     });
 

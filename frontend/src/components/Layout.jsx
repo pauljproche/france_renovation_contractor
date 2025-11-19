@@ -41,7 +41,10 @@ function Sidebar() {
   const navItems = [
     { path: '/dashboard', label: t('navDashboard'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT] },
     { path: '/materials', label: t('navMaterials'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT] },
+    { path: '/client-validation', label: t('navClientValidation'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT] },
     { path: '/chat-history', label: t('navChatHistory'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT] },
+    { path: '/edit-history', label: t('navEditHistory'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT] },
+    { path: '/prompt-library', label: t('navPromptLibrary'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT] },
     // Future: Add role-specific pages
     // { path: '/deliveries', label: t('navDeliveries'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT] },
     // { path: '/approvals', label: t('navApprovals'), roles: [ROLES.CLIENT, ROLES.ARCHITECT] },
