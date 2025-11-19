@@ -7,107 +7,19 @@ import { useChatHistory } from '../contexts/ChatHistoryContext.jsx';
 import { useAIPanel } from '../contexts/AppContext.jsx';
 import { useMaterialsData, MATERIALS_RELOAD_EVENT } from '../hooks/useMaterialsData.js';
 import { useCustomTable } from '../contexts/CustomTableContext.jsx';
-
-// Storage key for AI panel chat sessions
-const getAIPanelSessionsKey = () => {
-  const username = sessionStorage.getItem('username');
-  return username ? `ai-panel-sessions-${username}` : 'ai-panel-sessions-guest';
-};
-
-// Storage key for current session ID
-const getCurrentSessionIdKey = () => {
-  const username = sessionStorage.getItem('username');
-  return username ? `ai-panel-current-session-${username}` : 'ai-panel-current-session-guest';
-};
-
-// Load all chat sessions from localStorage
-const loadAIPanelSessions = () => {
-  try {
-    const key = getAIPanelSessionsKey();
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.warn('Failed to load AI panel sessions:', e);
-  }
-  return {};
-};
-
-// Save all chat sessions to localStorage
-const saveAIPanelSessions = (sessions) => {
-  try {
-    const key = getAIPanelSessionsKey();
-    localStorage.setItem(key, JSON.stringify(sessions));
-  } catch (e) {
-    console.warn('Failed to save AI panel sessions:', e);
-  }
-};
-
-// Get current session ID
-const getCurrentSessionId = () => {
-  try {
-    const key = getCurrentSessionIdKey();
-    return sessionStorage.getItem(key);
-  } catch (e) {
-    return null;
-  }
-};
-
-// Set current session ID
-const setCurrentSessionId = (sessionId) => {
-  try {
-    const key = getCurrentSessionIdKey();
-    if (sessionId) {
-      sessionStorage.setItem(key, sessionId);
-    } else {
-      sessionStorage.removeItem(key);
-    }
-  } catch (e) {
-    console.warn('Failed to set current session ID:', e);
-  }
-};
-
-// Create a new session
-const createNewSession = () => {
-  const sessionId = crypto.randomUUID();
-  const now = new Date();
-  return {
-    id: sessionId,
-    createdAt: now.toISOString(),
-    messages: []
-  };
-};
-
-// Save current session
-const saveCurrentSession = (messages) => {
-  if (messages.length === 0) return; // Don't save empty sessions
-  
-  const sessionId = getCurrentSessionId();
-  if (!sessionId) return;
-  
-  const sessions = loadAIPanelSessions();
-  sessions[sessionId] = {
-    id: sessionId,
-    createdAt: sessions[sessionId]?.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    messages: messages
-  };
-  saveAIPanelSessions(sessions);
-};
-
-// Load a specific session
-const loadSession = (sessionId) => {
-  const sessions = loadAIPanelSessions();
-  return sessions[sessionId]?.messages || [];
-};
-
-// Delete a session
-const deleteSession = (sessionId) => {
-  const sessions = loadAIPanelSessions();
-  delete sessions[sessionId];
-  saveAIPanelSessions(sessions);
-};
+import {
+  loadAIPanelSessions,
+  saveAIPanelSessions,
+  getCurrentSessionId,
+  setCurrentSessionId,
+  createNewSession,
+  saveCurrentSession,
+  loadSession,
+  deleteSession,
+  loadAIPanelMessages,
+  saveAIPanelMessages,
+  clearAIPanelMessages
+} from '../utils/aiPanelStorage.js';
 
 function AIPanel() {
   const { t } = useTranslation();

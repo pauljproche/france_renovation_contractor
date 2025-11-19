@@ -6,311 +6,14 @@ import { useProjects } from '../contexts/ProjectsContext.jsx';
 import { exportFacturePDF, exportDevisPDF } from '../utils/pdfExport.js';
 import { useCustomTable } from '../contexts/CustomTableContext.jsx';
 import { logEdit } from '../services/editHistory.js';
-
-const ALLOWED_STATUSES = ['approved', 'change_order', 'pending', 'rejected', 'supplied_by'];
-
-function EditableCellContent({ value, field, onUpdate, type = 'text', options = null }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value);
-
-  useEffect(() => {
-    if (!isEditing) {
-      setEditValue(value);
-    }
-  }, [value, isEditing]);
-
-  const handleSave = () => {
-    if (editValue !== value) {
-      onUpdate(field, editValue);
-    }
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditValue(value);
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleSave();
-    } else if (e.key === 'Escape') {
-      handleCancel();
-    }
-  };
-
-  if (!isEditing) {
-    return (
-      <span 
-        onClick={() => setIsEditing(true)}
-        style={{ cursor: 'pointer' }}
-        title="Click to edit"
-      >
-        {value !== null && value !== undefined ? String(value) : '—'}
-      </span>
-    );
-  }
-
-  return (
-    <>
-      {type === 'select' && options ? (
-        <select
-          value={editValue || ''}
-          onChange={(e) => setEditValue(e.target.value || null)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          autoFocus
-        >
-          <option value="">—</option>
-          {options.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      ) : (
-        <input
-          type={type}
-          value={editValue || ''}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          autoFocus
-        />
-      )}
-    </>
-  );
-}
-
-function ApprovalCellContent({ statusValue, statusField, noteValue, noteField, onUpdate }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <EditableCellContent
-        value={statusValue}
-        field={statusField}
-        onUpdate={onUpdate}
-        type="select"
-        options={ALLOWED_STATUSES}
-      />
-      <EditableCellContent
-        value={noteValue}
-        field={noteField}
-        onUpdate={onUpdate}
-        type="text"
-      />
-    </div>
-  );
-}
-
-function ApprovalTag({ status, note }) {
-  const { t } = useTranslation();
-  if (!status) {
-    return <span className="tag pending">{t('unknownTag')}</span>;
-  }
-  const statusMap = {
-    'approved': 'approved',
-    'change_order': 'changeOrder',
-    'pending': 'pending',
-    'rejected': 'rejected',
-    'supplied_by': 'suppliedBy'
-  };
-  const translationKey = statusMap[status] || status;
-  const translatedStatus = t(translationKey) || status.replace('_', ' ');
-  
-  const showNote = note && (status === 'change_order' || note.toLowerCase().includes('avenant'));
-  
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <span className={`tag ${status}`}>{translatedStatus}</span>
-      {showNote && (
-        <span style={{ fontSize: '0.75rem', color: '#6b7280', fontStyle: 'italic' }}>
-          {note}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function HTQuoteCell({ value, field, onUpdate }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value);
-
-  useEffect(() => {
-    if (!isEditing) {
-      setEditValue(value);
-    }
-  }, [value, isEditing]);
-
-  const handleSave = () => {
-    if (editValue !== value) {
-      const numValue = editValue === '' || editValue === null ? null : parseFloat(editValue);
-      onUpdate(field, numValue);
-    }
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditValue(value);
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleSave();
-    } else if (e.key === 'Escape') {
-      handleCancel();
-    }
-  };
-
-  if (!isEditing) {
-    if (value === null || value === undefined) {
-      return <td className="editable-cell" onClick={() => setIsEditing(true)} title="Click to edit">—</td>;
-    }
-    return (
-      <td className="editable-cell" onClick={() => setIsEditing(true)} title="Click to edit">
-        <span className="ht-quote-bubble">{value}</span>
-      </td>
-    );
-  }
-
-  return (
-    <td className="editable-cell editing">
-      <input
-        type="number"
-        value={editValue || ''}
-        onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleSave}
-        onKeyDown={handleKeyDown}
-        autoFocus
-      />
-    </td>
-  );
-}
-
-function DateBubbleCell({ value, field, onUpdate, cellClassName = '' }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value);
-
-  useEffect(() => {
-    if (!isEditing) {
-      setEditValue(value);
-    }
-  }, [value, isEditing]);
-
-  const handleSave = () => {
-    if (editValue !== value) {
-      onUpdate(field, editValue);
-    }
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditValue(value);
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleSave();
-    } else if (e.key === 'Escape') {
-      handleCancel();
-    }
-  };
-
-  if (!isEditing) {
-    if (value === null || value === undefined) {
-      return <td className={`editable-cell ${cellClassName}`} onClick={() => setIsEditing(true)} title="Click to edit">—</td>;
-    }
-    return (
-      <td className={`editable-cell ${cellClassName}`} onClick={() => setIsEditing(true)} title="Click to edit">
-        <span className="ht-quote-bubble">{value}</span>
-      </td>
-    );
-  }
-
-  return (
-    <td className={`editable-cell editing ${cellClassName}`}>
-      <input
-        type="text"
-        value={editValue || ''}
-        onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleSave}
-        onKeyDown={handleKeyDown}
-        autoFocus
-      />
-    </td>
-  );
-}
-
-function EditableCell({ value, field, onUpdate, type = 'text', options = null, cellClassName = '' }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(value);
-
-  // Update editValue when value changes externally
-  useEffect(() => {
-    if (!isEditing) {
-      setEditValue(value);
-    }
-  }, [value, isEditing]);
-
-  const handleSave = () => {
-    if (editValue !== value) {
-      onUpdate(field, editValue);
-    }
-    setIsEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditValue(value);
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleSave();
-    } else if (e.key === 'Escape') {
-      handleCancel();
-    }
-  };
-
-  if (!isEditing) {
-    return (
-      <td 
-        className={`editable-cell ${cellClassName}`} 
-        onClick={() => setIsEditing(true)}
-        title="Click to edit"
-      >
-        {value !== null && value !== undefined ? String(value) : '—'}
-      </td>
-    );
-  }
-
-  return (
-    <td className={`editable-cell editing ${cellClassName}`}>
-      {type === 'select' && options ? (
-        <select
-          value={editValue || ''}
-          onChange={(e) => setEditValue(e.target.value || null)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          autoFocus
-        >
-          <option value="">—</option>
-          {options.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-      ) : (
-        <input
-          type={type}
-          value={editValue || ''}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          autoFocus
-        />
-      )}
-    </td>
-  );
-}
+import {
+  EditableCellContent,
+  EditableCell,
+  HTQuoteCell,
+  DateBubbleCell,
+  ApprovalCellContent,
+  ApprovalTag
+} from './tableCells/index.js';
 
 export default function EditableMaterialsTable({ search }) {
   const { data, loading, error, updateMaterials } = useMaterialsData();
@@ -421,6 +124,7 @@ export default function EditableMaterialsTable({ search }) {
       const allColumns = [...originalColumnOrder, ...customColumns.map(c => c.id)];
       const storedOrder = userColumnOrder.filter(col => allColumns.includes(col));
       const missing = allColumns.filter(col => !storedOrder.includes(col));
+      // Add missing columns at the end to preserve user's custom order
       if (missing.length > 0) {
         setUserColumnOrder([...storedOrder, ...missing]);
       }
@@ -822,15 +526,18 @@ export default function EditableMaterialsTable({ search }) {
     const base = [...originalColumnOrder, ...customColumns.map(c => c.id)];
     // Use custom order if available, otherwise use base order
     if (userColumnOrder) {
-      // Merge: use custom order, then add any new columns that weren't in the custom order
-      const ordered = userColumnOrder.filter(col => base.includes(col));
+      // Use the user's custom order exactly as specified
+      // Only filter out columns that no longer exist (e.g., deleted custom columns)
+      const validOrder = userColumnOrder.filter(col => base.includes(col));
+      // Add any new columns (that weren't in userColumnOrder) at the end
       const newColumns = base.filter(col => !userColumnOrder.includes(col));
-      return [...ordered, ...newColumns];
+      return [...validOrder, ...newColumns];
     }
     return base;
-  }, [customColumns, userColumnOrder]);
+  }, [customColumns, userColumnOrder, originalColumnOrder]);
   
   // Reorder columns: move sorted column to front, and filter by visibility
+  // Preserve user's column order while moving sorted column to front
   const columnOrder = useMemo(() => {
     // Use allAvailableColumns which already respects custom order
     const visibleColumns = allAvailableColumns.filter(col => columnVisibility[col] !== false);
@@ -843,9 +550,10 @@ export default function EditableMaterialsTable({ search }) {
     // If sort column is hidden, use first visible column for sorting
     const effectiveSortColumn = visibleColumns.includes(sortColumn) ? sortColumn : visibleColumns[0];
     
-    // Move sorted column to front
+    // Preserve the user's order from allAvailableColumns, but move sorted column to front
     const sorted = visibleColumns.filter(col => col === effectiveSortColumn);
     const others = visibleColumns.filter(col => col !== effectiveSortColumn);
+    // Return with sorted column first, but preserve the relative order of others
     return [...sorted, ...others];
   }, [sortColumn, columnVisibility, allAvailableColumns]);
   
@@ -859,22 +567,40 @@ export default function EditableMaterialsTable({ search }) {
   
   // Move column up in order
   const moveColumnUp = (columnId) => {
-    const currentOrder = userColumnOrder || allAvailableColumns;
+    // Initialize userColumnOrder if it's null, using allAvailableColumns as base
+    // This ensures we have a complete order including all columns (visible and hidden)
+    let currentOrder = userColumnOrder;
+    if (!currentOrder) {
+      // Start with allAvailableColumns which has the base order
+      // This allows custom columns to be moved anywhere, not just among themselves
+      currentOrder = [...allAvailableColumns];
+    }
+    
     const index = currentOrder.indexOf(columnId);
     if (index > 0) {
       const newOrder = [...currentOrder];
       [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+      // Always set userColumnOrder, even if it was null before
       setUserColumnOrder(newOrder);
     }
   };
   
   // Move column down in order
   const moveColumnDown = (columnId) => {
-    const currentOrder = userColumnOrder || allAvailableColumns;
+    // Initialize userColumnOrder if it's null, using allAvailableColumns as base
+    // This ensures we have a complete order including all columns (visible and hidden)
+    let currentOrder = userColumnOrder;
+    if (!currentOrder) {
+      // Start with allAvailableColumns which has the base order
+      // This allows custom columns to be moved anywhere, not just among themselves
+      currentOrder = [...allAvailableColumns];
+    }
+    
     const index = currentOrder.indexOf(columnId);
     if (index >= 0 && index < currentOrder.length - 1) {
       const newOrder = [...currentOrder];
       [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+      // Always set userColumnOrder, even if it was null before
       setUserColumnOrder(newOrder);
     }
   };
@@ -1191,8 +917,9 @@ export default function EditableMaterialsTable({ search }) {
     saveChanges(newData);
   };
 
-  if (loading) return <span className="loader">{t('loadingData')}</span>;
-  if (error) return <p className="warning">{error}</p>;
+  if (loading) return <div className="loader">{t('loadingData')}</div>;
+  if (error) return <div className="warning">{error}</div>;
+  if (!data) return <div className="warning">{t('noData') || 'No data available'}</div>;
 
   return (
     <>
@@ -1332,11 +1059,11 @@ export default function EditableMaterialsTable({ search }) {
                   </div>
                 )}
                 <div className="custom-table-columns" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {allAvailableColumns.map((column, index) => {
+                  {(userColumnOrder || allAvailableColumns).map((column, index) => {
                     const isCustom = column.startsWith('custom_');
                     const currentOrder = userColumnOrder || allAvailableColumns;
                     const canMoveUp = index > 0;
-                    const canMoveDown = index < allAvailableColumns.length - 1;
+                    const canMoveDown = index < currentOrder.length - 1;
                     return (
                       <div key={column} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0', gap: '4px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}>
@@ -1650,21 +1377,13 @@ export default function EditableMaterialsTable({ search }) {
                       case 'clientValidation':
                         return (
                           <td key={column}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <EditableCell
-                                value={item?.approvals?.client?.status}
-                                field="approvals.client.status"
-                                onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value)}
-                                type="select"
-                                options={ALLOWED_STATUSES}
-                              />
-                              <EditableCell
-                                value={item?.approvals?.client?.note}
-                                field="approvals.client.note"
-                                onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value || null)}
-                                type="text"
-                              />
-                            </div>
+                            <ApprovalCellContent
+                              statusValue={item?.approvals?.client?.status}
+                              statusField="approvals.client.status"
+                              noteValue={item?.approvals?.client?.note}
+                              noteField="approvals.client.note"
+                              onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value || null)}
+                            />
                           </td>
                         );
                       case 'crayValidation':
@@ -2038,21 +1757,13 @@ export default function EditableMaterialsTable({ search }) {
                             case 'clientValidation':
                               return (
                                 <td key={column}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                    <EditableCell
-                                      value={item?.approvals?.client?.status}
-                                      field="approvals.client.status"
-                                      onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value)}
-                                      type="select"
-                                      options={ALLOWED_STATUSES}
-                                    />
-                                    <EditableCell
-                                      value={item?.approvals?.client?.note}
-                                      field="approvals.client.note"
-                                      onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value || null)}
-                                      type="text"
-                                    />
-                                  </div>
+                                  <ApprovalCellContent
+                                    statusValue={item?.approvals?.client?.status}
+                                    statusField="approvals.client.status"
+                                    noteValue={item?.approvals?.client?.note}
+                                    noteField="approvals.client.note"
+                                    onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value || null)}
+                                  />
                                 </td>
                               );
                             case 'crayValidation':

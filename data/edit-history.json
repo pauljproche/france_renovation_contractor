@@ -42,5 +42,27 @@
     "old_value": "pending",
     "new_value": "rejected",
     "source": "manual"
+  },
+  {
+    "timestamp": "2025-11-19T19:26:11.015893Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 4,
+    "product": "beegcat",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "rejected",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-11-19T19:27:08.251394Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "kronichi",
+    "field_path": "product",
+    "old_value": "",
+    "new_value": "kronichi",
+    "source": "manual"
   }
 ]

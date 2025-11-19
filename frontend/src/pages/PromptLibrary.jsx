@@ -1,36 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useLanguage } from '../contexts/AppContext.jsx';
-
-// Storage key for prompt library
-const getPromptLibraryKey = () => {
-  const username = sessionStorage.getItem('username');
-  return username ? `prompt-library-${username}` : 'prompt-library-guest';
-};
-
-// Load prompts from localStorage
-const loadPrompts = () => {
-  try {
-    const key = getPromptLibraryKey();
-    const stored = localStorage.getItem(key);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.warn('Failed to load prompt library:', e);
-  }
-  return [];
-};
-
-// Save prompts to localStorage
-const savePrompts = (prompts) => {
-  try {
-    const key = getPromptLibraryKey();
-    localStorage.setItem(key, JSON.stringify(prompts));
-  } catch (e) {
-    console.warn('Failed to save prompt library:', e);
-  }
-};
+import { loadPrompts, savePrompts } from '../utils/promptLibraryStorage.js';
 
 function PromptLibrary() {
   const { t } = useTranslation();
