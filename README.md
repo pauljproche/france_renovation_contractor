@@ -301,6 +301,37 @@ france_renovation_contractor/
 
 ## Getting Started (Phase 2: Tracking Dashboard)
 
+### Quick Start - Run All Services
+
+The easiest way to start the application is to use the provided startup script, which will start all three services (backend, frontend, and Zulip bot) with a single command:
+
+**Option 1: Using the shell script (Linux/macOS)**
+```bash
+chmod +x start_app.sh
+./start_app.sh
+```
+
+**Option 2: Using the Python script (Cross-platform)**
+```bash
+python start_app.py
+```
+
+This will start:
+- **FastAPI Backend** on http://localhost:8000
+- **React Frontend** on http://localhost:5173
+- **Zulip Bot** (listening for messages)
+
+All services will run in the background, and logs will be written to the `logs/` directory. Press `Ctrl+C` to stop all services.
+
+> **Note**: Make sure you have:
+> - Python dependencies installed (`pip install -r backend/requirements.txt`)
+> - Node.js dependencies installed (`cd frontend && npm install`)
+> - Environment variables configured (see setup sections below)
+
+### Manual Setup (Individual Services)
+
+If you prefer to run services individually or need to set up the project from scratch:
+
 ### Backend Setup (FastAPI)
 
 1. **Navigate to backend directory**
@@ -320,11 +351,19 @@ france_renovation_contractor/
    ```
 
 4. **Configure environment variables**
-   - Copy `.env.example` to `.env`
-   - Edit `.env` and add your OpenAI API key:
+   - Create `backend/.env` file and add your configuration:
    ```bash
+   # Required for LLM assistant
    OPENAI_API_KEY=sk-proj-your-key-here
    OPENAI_MODEL=gpt-4o-mini
+   
+   # Optional: Zulip bot configuration (if using Zulip integration)
+   ZULIP_EMAIL=your-bot@example.com
+   ZULIP_API_KEY=your-api-key-here
+   ZULIP_SITE=your-zulip-instance.com
+   ZULIP_BOT_NAME=contractor_bot
+   API_BASE_URL=http://localhost:8000
+   MATERIALS_FILE_PATH=../data/materials.json
    ```
 
 5. **Run the FastAPI server**
@@ -358,10 +397,43 @@ france_renovation_contractor/
    ```
    This reuses `scripts/validateMaterials.js` to make sure the dashboard and assistant see clean data.
 
-### Running Both Services
+### Zulip Bot Setup (Optional)
+
+The Zulip bot allows you to interact with the assistant via Zulip chat. To use it:
+
+1. **Configure environment variables**
+   - Create or edit `backend/.env` and add your Zulip credentials:
+   ```bash
+   ZULIP_EMAIL=your-bot@example.com
+   ZULIP_API_KEY=your-api-key-here
+   ZULIP_SITE=your-zulip-instance.com
+   ZULIP_BOT_NAME=contractor_bot
+   API_BASE_URL=http://localhost:8000
+   MATERIALS_FILE_PATH=../data/materials.json
+   ```
+
+2. **Get Zulip API credentials**
+   - Log into your Zulip instance
+   - Go to Settings → Your bots → Add a new bot
+   - Copy the bot's email and API key
+   - Use your Zulip instance domain (without https://) for `ZULIP_SITE`
+
+3. **Run the bot**
+   - The bot will automatically start when using the startup script
+   - Or run manually: `python -m backend.zulip_bot.bot`
+   - The bot responds to mentions of `@contractor_bot` in Zulip
+
+> **Note**: The Zulip bot requires the FastAPI backend to be running to process queries.
+
+### Running Services Individually
+
+If you prefer to run services in separate terminals:
 
 - **Terminal 1**: Run FastAPI backend (`cd backend && uvicorn main:app --reload`)
 - **Terminal 2**: Run React frontend (`cd frontend && npm run dev`)
+- **Terminal 3**: Run Zulip bot (`python -m backend.zulip_bot.bot`)
+
+> **Tip**: Use the startup script (`./start_app.sh` or `python start_app.py`) to run all three services at once!
 
 ### Assistant-Powered Table Edits & Reloading
 
@@ -396,8 +468,14 @@ france_renovation_contractor/
 
 ### 🚧 In Progress
 - Enhanced UI/UX improvements
-- Zulip chatbot integration (Phase 2.3)
 - Advanced task management features (Phase 2.4)
+
+### ✅ Recently Completed
+- **Zulip chatbot integration (Phase 2.3)** ✅
+  - Bot responds to mentions in Zulip
+  - Queries backend API for LLM responses
+  - Supports both stream and private messages
+  - Integrated with startup script for easy deployment
 
 ### 📋 Planned (Creating Devis - Phase 1)
 - Devis creation interface (HEMEA-like)
