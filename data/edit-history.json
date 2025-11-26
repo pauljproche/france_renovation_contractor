@@ -64,5 +64,250 @@
     "old_value": "",
     "new_value": "kronichi",
     "source": "manual"
+  },
+  {
+    "timestamp": "2025-11-19T22:40:32.058803Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 4,
+    "product": "beegcat",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T20:15:20.133475Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 2,
+    "product": "Suspension Estiluz Volta (T-3536-W, noir, LED 2700K, 3×565 lm, 86.7×54.3 cm)",
+    "field_path": "approvals.cray.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T20:17:40.764695Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 0,
+    "product": "Mitigeur Grohe Blue",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "rejected",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T20:17:40.767316Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 0,
+    "product": "Mitigeur Grohe Blue",
+    "field_path": "approvals.client.replacementUrls",
+    "old_value": null,
+    "new_value": [
+      "hellocat123",
+      "https://www.google.com"
+    ],
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T20:21:02.618324Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.replacementUrls",
+    "old_value": [
+      "hellocat123"
+    ],
+    "new_value": [
+      "non validé"
+    ],
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T20:22:41.947992Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "order.ordered",
+    "old_value": false,
+    "new_value": false,
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T20:42:16.662172Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.replacementUrls",
+    "old_value": [
+      "non validé"
+    ],
+    "new_value": [
+      "hellocat123",
+      "helloworld123"
+    ],
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T20:43:26.742628Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.replacementUrls",
+    "old_value": [
+      "hellocat123",
+      "helloworld123"
+    ],
+    "new_value": [
+      "hellocat123"
+    ],
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T20:52:03.457296Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.replacementUrls",
+    "old_value": [
+      "hellocat123"
+    ],
+    "new_value": [
+      "hellocat123"
+    ],
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T20:55:25.239773Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.replacementUrls",
+    "old_value": [
+      "hellocat123"
+    ],
+    "new_value": [
+      "hellocat123"
+    ],
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T21:00:11.815181Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 0,
+    "product": "Mitigeur Grohe Blue",
+    "field_path": "approvals.client.replacementUrls",
+    "old_value": [
+      "hellocat123",
+      "https://www.google.com"
+    ],
+    "new_value": [
+      "hellocat123"
+    ],
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T21:06:01.216022Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 0,
+    "product": "Mitigeur Grohe Blue",
+    "field_path": "approvals.client.replacementUrls",
+    "old_value": [
+      "hellocat123"
+    ],
+    "new_value": [],
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T21:15:25.229722Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 0,
+    "product": "Mitigeur Grohe Blue",
+    "field_path": "approvals.client.replacementUrls",
+    "old_value": [],
+    "new_value": [
+      "hellocat123"
+    ],
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-20T21:15:25.236085Z",
+    "section_id": "wc-1",
+    "section_label": "WC 1",
+    "item_index": 1,
+    "product": "Mitigeur Grohe (lave-mains)",
+    "field_path": "approvals.client.replacementUrls",
+    "old_value": null,
+    "new_value": [
+      "hellocat123"
+    ],
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-26T01:17:38.739679Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-26T01:17:38.744147Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.cray.status",
+    "old_value": null,
+    "new_value": "approved",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-26T01:18:51.953376Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "rejected",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-26T01:31:13.835510Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-11-26T01:35:28.358924Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "rejected",
+    "source": "agent"
   }
 ]

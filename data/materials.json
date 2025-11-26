@@ -17,7 +17,10 @@
             "client": {
               "status": "rejected",
               "note": null,
-              "validatedAt": "2025-11-12T20:11:58.934Z"
+              "validatedAt": "2025-11-12T20:11:58.934Z",
+              "replacementUrls": [
+                "hellocat123"
+              ]
             },
             "cray": {
               "status": "approved",
@@ -85,7 +88,7 @@
               "validatedAt": "2025-11-07T19:00:05.143Z"
             },
             "cray": {
-              "status": "rejected",
+              "status": "approved",
               "note": "non validé"
             }
           },
@@ -123,7 +126,7 @@
               ]
             },
             "cray": {
-              "status": null,
+              "status": "approved",
               "note": null
             }
           },
@@ -152,7 +155,7 @@
           },
           "approvals": {
             "client": {
-              "status": "rejected",
+              "status": "approved",
               "note": null,
               "validatedAt": "2025-11-19T19:26:10.944Z",
               "replacementUrls": [
@@ -230,7 +233,10 @@
           "approvals": {
             "client": {
               "status": "approved",
-              "note": null
+              "note": null,
+              "replacementUrls": [
+                "hellocat123"
+              ]
             },
             "cray": {
               "status": "approved",
