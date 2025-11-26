@@ -379,9 +379,12 @@ async def query_assistant(query: MaterialsQuery):
                         "index": idx,
                         "product": item.get("product", ""),  # PRIMARY IDENTIFIER
                         "reference": item.get("reference"),
+                        "laborType": item.get("laborType"),  # Task/Labor type
+                        "supplierLink": item.get("supplierLink"),  # Supplier URL
                         "priceTTC": item.get("price", {}).get("ttc"),
                         "approvals": item.get("approvals", {}),
-                        "order": item.get("order", {})
+                        "order": item.get("order", {}),
+                        "comments": item.get("comments", {})  # Comments from client/cray
                     }
                     section_data["items"].append(item_data)
                 sections_summary.append(section_data)
@@ -408,7 +411,13 @@ async def query_assistant(query: MaterialsQuery):
         # Load system prompt from external file
         system_prompt = load_system_prompt()
 
-        user_content = f"Materials data:\n{materials_text}{custom_tables_info}\n\nQuestion: {query.prompt}"
+        # Add explicit instruction for validation questions
+        validation_instruction = ""
+        prompt_lower = query.prompt.lower()
+        if any(keyword in prompt_lower for keyword in ["what items need", "what needs to be validated", "items requiring", "needs validation"]):
+            validation_instruction = "\n\n⚠️ CRITICAL INSTRUCTION: You MUST check EVERY item in EVERY section. Do not stop after finding one item. List ALL items that need validation (status: rejected, change_order, null, or any non-approved status). Count them carefully.\n\n"
+        
+        user_content = f"Materials data:\n{materials_text}{custom_tables_info}{validation_instruction}Question: {query.prompt}"
 
         tools = [
             {

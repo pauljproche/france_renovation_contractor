@@ -116,10 +116,12 @@ class ContractorBot:
         """
         query_lower = query.lower()
         
-        # Check if it's an action request (user wants to validate/approve something)
+        # Check if it's an action request (user wants to validate/approve/reject something)
         action_patterns = [
             'validate the', 'validate this', 'validate [', 'approve the', 'approve this',
-            'can you validate', 'please validate', 'validate item', 'validate as'
+            'can you validate', 'please validate', 'validate item', 'validate as',
+            'reject the', 'reject this', 'reject [', 'can you reject', 'please reject',
+            'reject item', 'reject as'
         ]
         if any(pattern in query_lower for pattern in action_patterns):
             return False  # This is an action, not a question
@@ -316,14 +318,28 @@ class ContractorBot:
             logger.warning(f"Could not set typing status: {e}")
         
         try:
+            # Reload materials data to ensure we have the latest data
+            try:
+                self.materials_data = load_materials_data(self.config["materials_file_path"])
+                # Log data summary for debugging
+                if self.materials_data and self.materials_data.get("sections"):
+                    total_items = sum(len(s.get("items", [])) for s in self.materials_data["sections"])
+                    logger.info(f"Materials data reloaded: {len(self.materials_data['sections'])} sections, {total_items} total items")
+            except Exception as e:
+                logger.warning(f"Failed to reload materials data, using cached data: {e}")
+                # Continue with cached data if reload fails
+            
             # Query the assistant API
             logger.info("Querying assistant API...")
             
             # Add conversation context to the prompt if available
+            # BUT: For validation questions, don't include context as it might confuse the LLM
             enhanced_prompt = query
-            if conversation_context:
+            if conversation_context and not is_validation_question:
                 enhanced_prompt = f"Recent conversation:\n{conversation_context}\n\nCurrent request: {query}"
                 logger.info(f"Added conversation context ({len(conversation_context)} chars)")
+            elif conversation_context and is_validation_question:
+                logger.info("Skipping conversation context for validation question to ensure complete results")
             
             response = query_assistant(
                 api_base_url=self.config["api_base_url"],

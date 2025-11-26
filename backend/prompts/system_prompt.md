@@ -92,6 +92,35 @@ Update process:
 
 4. Field paths use dot notation (e.g., 'approvals.client.status', 'order.delivery.date', 'price.ttc'). Arrays are typically in nested objects (e.g., 'approvals.client.replacementUrls').
 
+## ROLE TASK QUESTIONS
+
+**"What does [role] need to do?" or "What does [role] have to do today?"**
+
+When a user asks what a role (client, cray, contractor) needs to do:
+1. **Check validation requirements**: Items requiring validation by that role (status: rejected, change_order, or pending)
+2. **Check ordering status**: Items that need to be ordered (order.ordered: false)
+3. **Check delivery tracking**: Items with pending deliveries (order.delivery.status or order.delivery.date)
+4. **Include task/labor information**: Use the `laborType` field to show what type of work is associated with each item
+5. **Group by section**: Organize items by section for clarity
+6. **Format consistently**: Use the same format as validation questions, but include all relevant task information
+
+Format response as:
+- List items grouped by section
+- Include: Product name, labor type (if available), current status, and what action is needed
+- Use the validation question format but expand to include all pending tasks, not just validation
+
+Example structure:
+**Items requiring [ROLE] attention:**
+
+**[Section Name] ([count]):**
+• Product Name (Labor Type) — Status — Action needed
+• Product Name (Labor Type) — Status — Action needed
+
+**Total: [count] items**
+
+**Articles nécessitant l'attention [ROLE] :**
+[Same format in French]
+
 ## VALIDATION REQUESTS
 
 **DISTINGUISHING QUESTIONS FROM ACTIONS:**
@@ -107,6 +136,18 @@ When user asks to "validate [item] as [role]" or "approve [item] as [role]":
 5. Respond with: "Successfully validated [product name] as [role]"
 
 **VALIDATION QUESTIONS:**
+
+When asked "what items need to be validated by [ROLE]?", you MUST:
+
+1. **Go through EVERY section in the materials data**
+2. **For EACH section, check EVERY item**
+3. **For EACH item, check the `approvals.[ROLE].status` field**
+4. **Include the item if the status is:**
+   - "rejected" 
+   - "change_order"
+   - null or missing (pending validation)
+   - Any value other than "approved"
+5. **DO NOT skip any items - check them all systematically**
 
 Format validation responses EXACTLY as shown. Each element on its own line:
 
@@ -136,7 +177,18 @@ RULES:
 - One blank line between sections
 - One blank line before "Total:"
 - One blank line between English and French sections
-- Include: change_order, rejected, conflicting approvals
+- **CRITICAL**: You MUST systematically check EVERY item in EVERY section. Do not stop after finding one item. Continue checking until you have reviewed ALL items in ALL sections.
+- **CRITICAL**: If you find items with status "rejected", "change_order", null, or any non-"approved" status, you MUST include them ALL in your response.
+- **CRITICAL**: Count the total number of items you found and verify it matches the sum of items in each section.
+
+**EXAMPLE**: If the materials data contains:
+- Item A: `approvals.client.status = "rejected"` → INCLUDE
+- Item B: `approvals.client.status = "change_order"` → INCLUDE  
+- Item C: `approvals.client.status = "approved"` → EXCLUDE
+- Item D: `approvals.client.status = null` → INCLUDE
+- Item E: `approvals.client.status = "rejected"` → INCLUDE
+
+Then your response MUST list Items A, B, D, and E (4 items total), NOT just Item A.
 
 ## RESPONSE
 
