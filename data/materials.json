@@ -126,7 +126,7 @@
               ]
             },
             "cray": {
-              "status": "approved",
+              "status": null,
               "note": null
             }
           },
