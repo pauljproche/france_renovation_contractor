@@ -112,7 +112,7 @@ export default function EditableMaterialsTable({ search }) {
       }
     } catch (e) {
       console.warn('Failed to load column order preferences:', e);
-    }
+}
     return null; // null means use original order
   };
   
@@ -139,7 +139,7 @@ export default function EditableMaterialsTable({ search }) {
         localStorage.setItem('materials-table-column-order', JSON.stringify(userColumnOrder));
       } catch (e) {
         console.warn('Failed to save column order preferences:', e);
-      }
+  }
     }
   }, [userColumnOrder]);
   
@@ -166,7 +166,7 @@ export default function EditableMaterialsTable({ search }) {
     const handleClickOutside = (event) => {
       if (columnManagerRef.current && !columnManagerRef.current.contains(event.target)) {
         setShowColumnManager(false);
-      }
+    }
       if (customTableBuilderRef.current && !customTableBuilderRef.current.contains(event.target)) {
         setShowCustomTableBuilder(false);
       }
@@ -203,7 +203,7 @@ export default function EditableMaterialsTable({ search }) {
     }, {});
     setColumnVisibility(allHidden);
   };
-  
+
   // Add a new custom column
   const handleAddCustomColumn = () => {
     if (!newColumnName.trim()) {
@@ -216,8 +216,8 @@ export default function EditableMaterialsTable({ search }) {
     if (allColumnIds.includes(columnId)) {
       alert(t('columnExists') || 'A column with this name already exists');
       return;
-    }
-    
+  }
+
     const newColumn = {
       id: columnId,
       label: newColumnName.trim(),
@@ -535,7 +535,7 @@ export default function EditableMaterialsTable({ search }) {
     }
     return base;
   }, [customColumns, userColumnOrder, originalColumnOrder]);
-  
+
   // Reorder columns: move sorted column to front, and filter by visibility
   // Preserve user's column order while moving sorted column to front
   const columnOrder = useMemo(() => {
@@ -1223,7 +1223,7 @@ export default function EditableMaterialsTable({ search }) {
         <table className={`materials-table ${viewMode === 'concise' ? 'concise-mode' : 'expanded-mode'}`}>
         <thead>
           <tr>
-            <th className="select-column">{t('select')}</th>
+              <th className="select-column">{t('select')}</th>
             {columnOrder.map((column) => {
               const isExpandable = ['ordered', 'orderDate', 'deliveryDate', 'deliveryStatus', 'quantity', 'comments'].includes(column);
               return (
@@ -1382,8 +1382,8 @@ export default function EditableMaterialsTable({ search }) {
                               statusField="approvals.client.status"
                               noteValue={item?.approvals?.client?.note}
                               noteField="approvals.client.note"
-                              onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value || null)}
-                            />
+                                onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value || null)}
+                              />
                           </td>
                         );
                       case 'crayValidation':
@@ -1559,14 +1559,14 @@ export default function EditableMaterialsTable({ search }) {
                   
                   return (
                     <tr key={`${item.sectionId}-${item.itemIndex}`} className={rowClassNames || undefined}>
-                      <td className="select-column">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleSelectRow(rowKey)}
-                          aria-label={`${t('select')} ${item.product || ''}`.trim()}
-                        />
-                      </td>
+                        <td className="select-column">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleSelectRow(rowKey)}
+                            aria-label={`${t('select')} ${item.product || ''}`.trim()}
+                          />
+                        </td>
                       {columnOrder.map(column => renderCell(column))}
                       <td key="actions" className="actions-column" style={{ width: '40px', textAlign: 'center' }}>
                         <button 
@@ -1762,8 +1762,8 @@ export default function EditableMaterialsTable({ search }) {
                                     statusField="approvals.client.status"
                                     noteValue={item?.approvals?.client?.note}
                                     noteField="approvals.client.note"
-                                    onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value || null)}
-                                  />
+                                      onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value || null)}
+                                    />
                                 </td>
                               );
                             case 'crayValidation':

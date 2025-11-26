@@ -6,9 +6,12 @@ import os
 import json
 import re
 import httpx
+import logging
 from typing import Optional, Any, Tuple, List
 from datetime import datetime
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -16,6 +19,8 @@ load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MATERIALS_FILE_PATH = os.path.join(BASE_DIR, '..', 'data', 'materials.json')
 EDIT_HISTORY_FILE_PATH = os.path.join(BASE_DIR, '..', 'data', 'edit-history.json')
+SUSPICIOUS_ACTIVITY_LOG = os.path.join(BASE_DIR, '..', 'logs', 'suspicious_activity.md')
+SYSTEM_PROMPT_PATH = os.path.join(BASE_DIR, 'prompts', 'system_prompt.md')
 
 app = FastAPI(title="Renovation Contractor API")
 
@@ -48,6 +53,22 @@ def write_materials_data(data: dict) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def load_system_prompt() -> str:
+    """
+    Load the system prompt from the markdown file.
+    
+    Returns:
+        str: The system prompt text
+    """
+    try:
+        with open(SYSTEM_PROMPT_PATH, 'r', encoding='utf-8') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        logger.warning(f"System prompt file not found at {SYSTEM_PROMPT_PATH}, using fallback")
+        # Fallback to a minimal prompt if file is missing
+        return "You are an assistant for a renovation construction site. Use strictly the provided data."
+
+
 def load_edit_history() -> List[dict]:
     """Load edit history from file."""
     if not os.path.exists(EDIT_HISTORY_FILE_PATH):
@@ -63,6 +84,47 @@ def save_edit_history(history: List[dict]) -> None:
     """Save edit history to file."""
     with open(EDIT_HISTORY_FILE_PATH, 'w', encoding='utf-8') as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
+
+
+def log_suspicious_activity(prompt: str, error_type: str, error_detail: str, 
+                           attempted_action: Optional[dict] = None) -> None:
+    """
+    Log suspicious activity (validation failures, wrong item attempts, etc.) to a markdown file.
+    
+    Args:
+        prompt: The user's original prompt
+        error_type: Type of suspicious activity (e.g., 'product_mismatch', 'no_change_update', 'array_operation_error')
+        error_detail: Detailed error message
+        attempted_action: Optional dict with attempted action details (section_id, item_index, field_path, etc.)
+    """
+    # Ensure logs directory exists
+    log_dir = os.path.dirname(SUSPICIOUS_ACTIVITY_LOG)
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Check if file exists, if not create with header
+    file_exists = os.path.exists(SUSPICIOUS_ACTIVITY_LOG)
+    
+    timestamp = datetime.utcnow().isoformat() + "Z"
+    
+    with open(SUSPICIOUS_ACTIVITY_LOG, 'a', encoding='utf-8') as f:
+        if not file_exists:
+            f.write("# Suspicious Activity Log\n\n")
+            f.write("This file logs suspicious activities detected by validation, such as:\n")
+            f.write("- Attempts to update wrong items\n")
+            f.write("- No-change updates\n")
+            f.write("- Array operation errors\n")
+            f.write("- Product mismatches\n\n")
+            f.write("---\n\n")
+        
+        f.write(f"## {timestamp}\n\n")
+        f.write(f"**Error Type:** `{error_type}`\n\n")
+        f.write(f"**User Prompt:**\n```\n{prompt}\n```\n\n")
+        f.write(f"**Error Detail:**\n```\n{error_detail}\n```\n\n")
+        
+        if attempted_action:
+            f.write(f"**Attempted Action:**\n```json\n{json.dumps(attempted_action, indent=2)}\n```\n\n")
+        
+        f.write("---\n\n")
 
 
 def log_edit(section_id: str, section_label: str, item_index: int, product: str, 
@@ -127,7 +189,60 @@ def get_nested_value(target: dict, field_path: str) -> Any:
     return current
 
 
-def update_cell(section_id: str, item_index: int, field_path: str, new_value: Any, source: str = "agent") -> Tuple[dict, dict]:
+def find_matching_items(materials_data: dict, product_identifier: str) -> List[dict]:
+    """
+    Find all items that match a product identifier.
+    
+    Args:
+        materials_data: The materials data dictionary
+        product_identifier: Product identifier to match (can be partial or exact match)
+    
+    Returns:
+        List of dicts with keys: section_id, section_label, item_index, product, item
+    """
+    matches = []
+    identifier_lower = product_identifier.lower()
+    
+    for section in materials_data.get('sections', []):
+        section_id = section.get('id', '')
+        section_label = section.get('label', '')
+        
+        for idx, item in enumerate(section.get('items', [])):
+            product = item.get('product', '').lower()
+            
+            # Check if identifier matches product
+            # Exact match or identifier is contained in product name
+            if identifier_lower == product or identifier_lower in product:
+                matches.append({
+                    'section_id': section_id,
+                    'section_label': section_label,
+                    'item_index': idx,
+                    'product': item.get('product', ''),
+                    'item': item
+                })
+    
+    return matches
+
+
+def update_cell(section_id: str, item_index: int, field_path: str, new_value: Any, source: str = "agent", 
+                expected_product_hint: Optional[str] = None) -> Tuple[dict, dict]:
+    """
+    Update a single field in the materials table with validation.
+    
+    Args:
+        section_id: Section identifier
+        item_index: Zero-based item index
+        field_path: Dot-delimited path to field
+        new_value: New value to set
+        source: Source of the update ('agent' or 'manual')
+        expected_product_hint: Optional product name hint for validation (can be partial or exact match)
+    
+    Returns:
+        Tuple of (updated data, updated item)
+    
+    Raises:
+        ValueError: If validation fails or item doesn't match expected product
+    """
     data = load_materials_data()
     sections = data.get('sections', [])
     section = match_section(sections, section_id)
@@ -140,6 +255,54 @@ def update_cell(section_id: str, item_index: int, field_path: str, new_value: An
     
     # Get old value before updating
     old_value = get_nested_value(item, field_path)
+    
+    # VALIDATION: Check if new value is actually different (especially for arrays)
+    if old_value == new_value:
+        product = item.get('product', '')
+        error_msg = (
+            f"Update would result in no change. Old value and new value are identical for "
+            f"product '{product}' at field '{field_path}'. Old: {old_value}, New: {new_value}"
+        )
+        # Log suspicious activity (but don't include user prompt here - it's added at call site)
+        raise ValueError(error_msg)
+    
+    # VALIDATION: For array fields, verify the operation makes sense
+    if isinstance(old_value, list) and isinstance(new_value, list):
+        # Check if this looks like a valid array modification
+        if len(new_value) > len(old_value) + 1:
+            product = item.get('product', '')
+            raise ValueError(
+                f"Suspicious array update: new array has {len(new_value)} items, old had {len(old_value)}. "
+                f"This might indicate an error. Product: '{product}', field: '{field_path}'"
+            )
+        # If removing, new should have fewer items
+        # If adding, new should have same or one more item
+        if len(new_value) == len(old_value) and old_value != new_value:
+            # Same length but different - might be a replacement, which is OK
+            pass
+        elif len(new_value) > len(old_value) + 1:
+            # Adding more than one item unexpectedly
+            product = item.get('product', '')
+            raise ValueError(
+                f"Array update adds too many items unexpectedly. Product: '{product}', field: '{field_path}'"
+            )
+    
+    # VALIDATION: If expected_product_hint is provided, verify the item matches
+    if expected_product_hint:
+        product = item.get('product', '').lower()
+        hint_lower = expected_product_hint.lower()
+        # Check if hint matches product (exact match or contains)
+        # Partial match: hint contained in product name (e.g., 'faucet' matches 'Kitchen Faucet Model X')
+        # Exact match: hint exactly matches product name (e.g., 'item123' matches 'item123')
+        hint_matches = (hint_lower in product) or (product in hint_lower)
+        
+        if not hint_matches:
+            error_msg = (
+                f"Product mismatch: User requested update for item matching '{expected_product_hint}', "
+                f"but update_cell was called on '{item.get('product', '')}' at index {item_index} in section '{section_id}'. "
+                f"This is likely the WRONG ITEM. Please find the correct item that matches '{expected_product_hint}'."
+            )
+            raise ValueError(error_msg)
     
     # Update the value
     set_nested_value(item, field_path, new_value)
@@ -211,14 +374,16 @@ async def query_assistant(query: MaterialsQuery):
                     "items": []
                 }
                 for idx, item in enumerate(section.get("items", [])):
-                    section_data["items"].append({
+                    # Format item with product name prominently for easier identification
+                    item_data = {
                         "index": idx,
-                        "product": item.get("product", ""),
+                        "product": item.get("product", ""),  # PRIMARY IDENTIFIER
                         "reference": item.get("reference"),
                         "priceTTC": item.get("price", {}).get("ttc"),
                         "approvals": item.get("approvals", {}),
                         "order": item.get("order", {})
-                    })
+                    }
+                    section_data["items"].append(item_data)
                 sections_summary.append(section_data)
             materials_text = json.dumps(sections_summary, indent=2, ensure_ascii=False)
 
@@ -240,19 +405,8 @@ async def query_assistant(query: MaterialsQuery):
                 )
             custom_tables_info = "\n\nCustom Tables Created:\n" + "\n".join(custom_tables_text) + "\n"
 
-        system_prompt = (
-            "You are an assistant for a renovation construction site. "
-            "Use strictly the provided data to respond concisely. "
-            "Cite relevant sections (e.g., Kitchen, WC 1) when necessary and reference both the section label and its sectionId when describing updates. "
-            "If custom tables are provided, you can reference them and their specific column configurations. "
-            "When the user asks for a change, extract the section (either label or sectionId), the zero-based item index, the exact field path, "
-            "and the new value directly from their request plus the data context, then immediately call the update_cell tool with those details. "
-            "Do not ask the user to confirm once you have enough information—act autonomously. "
-            "IMPORTANT: Always provide your response in BOTH English and French. "
-            "Format exactly as follows (no other text before or after):\n"
-            "EN: [Your English response here]\n"
-            "FR: [Your French response here]"
-        )
+        # Load system prompt from external file
+        system_prompt = load_system_prompt()
 
         user_content = f"Materials data:\n{materials_text}{custom_tables_info}\n\nQuestion: {query.prompt}"
 
@@ -263,7 +417,15 @@ async def query_assistant(query: MaterialsQuery):
                     "name": "update_cell",
                     "description": (
                         "Update a single field in the materials table. "
-                        "Use this only after confirming the exact section, item index, and field path."
+                        "BEFORE calling this function, you MUST:\n"
+                        "1. Find the item by matching product identifier from user's request to materials data\n"
+                        "2. Verify the item's product name matches what user requested (identifier can be partial or exact match)\n"
+                        "3. Read the current value from THAT specific item (for arrays, read the entire current array)\n"
+                        "4. Modify the value appropriately:\n"
+                        "   - Arrays: preserve all existing items unless removing, then add/remove only the specified item(s)\n"
+                        "   - Non-arrays: set to the new value\n"
+                        "5. Verify section_id, item_index, and product name all match the correct item\n"
+                        "Parameters: section_id (section identifier), item_index (zero-based), field_path (dot-delimited path like 'approvals.client.status'), new_value (complete modified value)."
                     ),
                     "parameters": {
                         "type": "object",
@@ -301,6 +463,260 @@ async def query_assistant(query: MaterialsQuery):
             }
         ]
 
+        # Extract conversation context if present
+        conversation_context = ""
+        original_prompt = query.prompt
+        if "Recent conversation:" in query.prompt:
+            # Extract the conversation context from the prompt
+            parts = query.prompt.split("Current request:", 1)
+            if len(parts) == 2:
+                conversation_context = parts[0].replace("Recent conversation:", "").strip()
+                query.prompt = parts[1].strip()  # Update prompt to just the current request
+        
+        # Check if this is a confirmation response (user saying "all", "all of them", etc.)
+        prompt_lower = query.prompt.lower()
+        confirmation_phrases = ['all of them', 'all items', 'yes, all', 'update all', 'all', 'yes all', 'update all of them']
+        is_confirmation = any(phrase in prompt_lower for phrase in confirmation_phrases)
+        
+        # Log for debugging
+        if is_confirmation:
+            logger.info(f"Confirmation detected in prompt: '{query.prompt}'")
+            logger.info(f"Conversation context length: {len(conversation_context)} chars")
+            if conversation_context:
+                logger.info(f"Conversation context preview: {conversation_context[:200]}...")
+        
+        if is_confirmation and query.materials:
+            # This is a confirmation - extract what was originally requested from conversation context
+            product_hint = None
+            operation = None
+            value_to_operate = None
+            field_path = None
+            
+            # Combine conversation context and current prompt for analysis
+            full_context = (conversation_context + " " + query.prompt) if conversation_context else query.prompt
+            context_lower = full_context.lower()
+            
+            # Extract product hint generically from conversation context
+            # CRITICAL: For confirmations, prioritize the ORIGINAL request, not the confirmation message
+            # Priority: 1) Quoted strings (most specific), 2) Common product identifiers from ORIGINAL request, 3) Pattern matching from ORIGINAL request
+            
+            # First, try to extract from the ORIGINAL request (conversation_context) if available
+            original_context = conversation_context if conversation_context else ""
+            original_lower = original_context.lower()
+            
+            quoted_matches = re.findall(r'["\']([^"\']+)["\']', full_context)
+            if quoted_matches:
+                # Use quoted strings as product hints (most reliable)
+                product_hint = quoted_matches[0].lower()
+            else:
+                # Check for common product identifiers - prioritize ORIGINAL request
+                common_identifiers = ['mitigeur', 'cathat', 'suspension', 'meuble', 'armoire', 'wc', 'lave-mains', 'beegcat', 'évier']
+                for identifier in common_identifiers:
+                    # Check original request first
+                    if original_context and identifier in original_lower:
+                        product_hint = identifier
+                        break
+                    # Fall back to full context
+                    elif identifier in context_lower:
+                        product_hint = identifier
+                        break
+                
+                # If still no hint, try to extract from patterns - prioritize ORIGINAL request
+                if not product_hint:
+                    # Look for patterns like "the X" or "X in" where X might be a product
+                    # Try original request first
+                    search_text = original_context if original_context else full_context
+                    product_patterns = [
+                        r'validate\s+(?:the\s+)?([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+(?:item|in|as)',  # "validate cathat item" or "validate cathat in"
+                        r'approve\s+(?:the\s+)?([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+(?:item|in|as)',  # "approve cathat item"
+                        r'the\s+([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+item',  # "the cathat item"
+                        r'([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+item\s+in',  # "cathat item in"
+                    ]
+                    for pattern in product_patterns:
+                        matches = re.findall(pattern, search_text, re.IGNORECASE)
+                        if matches:
+                            # Use the first match from original request (most reliable)
+                            candidate = matches[0].lower()
+                            # Filter out common words that aren't products
+                            if candidate not in ['all', 'them', 'items', 'update', 'the', 'this', 'that', 'cuisine', 'section', 'specific']:
+                                product_hint = candidate
+                                break
+                    
+                    # Fallback to simpler patterns if still no match
+                    if not product_hint:
+                        simple_patterns = [
+                            r'the\s+([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)',
+                            r'([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+in',
+                        ]
+                        for pattern in simple_patterns:
+                            matches = re.findall(pattern, search_text, re.IGNORECASE)
+                            if matches:
+                                candidate = matches[0].lower()
+                                # Filter out common words and section names
+                                if candidate not in ['all', 'them', 'items', 'update', 'the', 'this', 'that', 'cuisine', 'section', 'specific', 'found']:
+                                    product_hint = candidate
+                                    break
+            
+            # Extract field_path from conversation context
+            # Look for mentions of specific fields
+            field_keywords = {
+                'replacementUrls': ['replacement', 'url', 'replacementurl', 'replacement url', 'urls'],
+                'approvals.client.status': ['client status', 'client approval', 'approval status'],
+                'approvals.cray.status': ['cray status', 'cray approval', 'contractor status'],
+                'order.status': ['order status', 'ordered', 'ordering'],
+                'order.ordered': ['ordered', 'order date']
+            }
+            
+            for field, keywords in field_keywords.items():
+                if any(keyword in context_lower for keyword in keywords):
+                    field_path = field
+                    break
+            
+            # Default to replacementUrls if operation involves URLs/links
+            if not field_path and ('url' in context_lower or 'link' in context_lower):
+                field_path = "approvals.client.replacementUrls"
+            
+            # Extract operation and value from conversation context
+            if conversation_context:
+                # Look for add operation
+                if 'add' in context_lower or 'insert' in context_lower or 'append' in context_lower:
+                    operation = 'add'
+                    # Extract value to add
+                    quoted = re.findall(r'["\']([^"\']+)["\']', conversation_context)
+                    if not quoted:
+                        # Try to extract from patterns like "add the link X" or "add X to"
+                        patterns = [
+                            r'add\s+(?:the\s+)?(?:link\s+)?([a-zA-Z0-9\-_\.]+(?:\.com|\.org|://)?[a-zA-Z0-9\-_\.]*)',
+                            r'add\s+([a-zA-Z0-9\-_\.]+)\s+to',
+                            r'insert\s+([a-zA-Z0-9\-_\.]+)',
+                            r'append\s+([a-zA-Z0-9\-_\.]+)'
+                        ]
+                        for pattern in patterns:
+                            matches = re.findall(pattern, conversation_context, re.IGNORECASE)
+                            if matches:
+                                value_to_operate = matches[-1]
+                                break
+                    else:
+                        value_to_operate = quoted[-1]
+                
+                # Look for remove operation
+                elif 'remove' in context_lower or 'get rid of' in context_lower or 'delete' in context_lower or 'eliminate' in context_lower:
+                    operation = 'remove'
+                    quoted = re.findall(r'["\']([^"\']+)["\']', conversation_context)
+                    if not quoted:
+                        patterns = [
+                            r'remove\s+(?:the\s+)?(?:link\s+)?([a-zA-Z0-9\-_\.]+(?:\.com|\.org|://)?[a-zA-Z0-9\-_\.]*)',
+                            r'get rid of\s+(?:the\s+)?([a-zA-Z0-9\-_\.]+)',
+                            r'delete\s+([a-zA-Z0-9\-_\.]+)',
+                            r'eliminate\s+([a-zA-Z0-9\-_\.]+)'
+                        ]
+                        for pattern in patterns:
+                            matches = re.findall(pattern, conversation_context, re.IGNORECASE)
+                            if matches:
+                                value_to_operate = matches[-1]
+                                break
+                    else:
+                        value_to_operate = quoted[-1]
+                
+                # Look for set/update operation (for non-array fields)
+                elif 'set' in context_lower or 'update' in context_lower or 'change' in context_lower:
+                    # For non-array operations, extract the new value
+                    operation = 'set'
+                    # Try to extract value from patterns
+                    quoted = re.findall(r'["\']([^"\']+)["\']', conversation_context)
+                    if quoted:
+                        value_to_operate = quoted[-1]
+                    else:
+                        # Look for patterns like "set to X" or "change to X"
+                        patterns = [
+                            r'set\s+to\s+([a-zA-Z0-9\-_\.]+)',
+                            r'change\s+to\s+([a-zA-Z0-9\-_\.]+)',
+                            r'update\s+to\s+([a-zA-Z0-9\-_\.]+)'
+                        ]
+                        for pattern in patterns:
+                            matches = re.findall(pattern, conversation_context, re.IGNORECASE)
+                            if matches:
+                                value_to_operate = matches[-1]
+                                break
+            
+            # Only proceed if we have enough information
+            if product_hint and operation and field_path:
+                # For add/remove operations, we need value_to_operate
+                # For set operations, value_to_operate is optional (could be in the original request)
+                if operation in ['add', 'remove'] and not value_to_operate:
+                    logger.warning(f"Confirmation detected but missing value_to_operate for {operation} operation")
+                    # Still proceed - let LLM extract from context
+                elif operation == 'set' and not value_to_operate:
+                    # For set operations, value might be in the original request - proceed anyway
+                    pass
+                matching_items = find_matching_items(query.materials, product_hint)
+                if len(matching_items) > 1:
+                    items_list = "\n".join([f"{i+1}. {m['section_label']} - {m['product']} (section_id: {m['section_id']}, index: {m['item_index']})" for i, m in enumerate(matching_items)])
+                    
+                    # Build operation description
+                    operation_desc = f"{operation.upper()}"
+                    if value_to_operate:
+                        operation_desc += f" '{value_to_operate}'"
+                    if operation in ['add', 'remove']:
+                        operation_desc += " to/from array"
+                    elif operation == 'set':
+                        operation_desc += " value"
+                    
+                    context_addendum = (
+                        f"\n\n🚨🚨🚨 CONFIRMATION DETECTED - EXECUTE IMMEDIATELY 🚨🚨🚨\n"
+                        f"\nUser confirmed to update ALL {len(matching_items)} items matching '{product_hint}'.\n"
+                        f"\nItems to update:\n{items_list}\n"
+                        f"\nOperation: {operation_desc}\n"
+                        f"Field: {field_path}\n"
+                    )
+                    
+                    if value_to_operate:
+                        context_addendum += f"Value: '{value_to_operate}'\n"
+                    
+                    context_addendum += (
+                        f"\n⚠️ ACTION REQUIRED - DO THIS NOW: ⚠️\n"
+                        f"1. For EACH item in the list above, call update_cell with:\n"
+                        f"   - section_id: (from item list)\n"
+                        f"   - item_index: (from item list)\n"
+                        f"   - field_path: '{field_path}'\n"
+                    )
+                    
+                    if operation in ['add', 'remove']:
+                        if value_to_operate:
+                            context_addendum += (
+                                f"   - old_value: (read current array from that item)\n"
+                                f"   - new_value: (apply {operation} operation to {'add' if operation == 'add' else 'remove'} '{value_to_operate}')\n"
+                            )
+                        else:
+                            context_addendum += (
+                                f"   - old_value: (read current array from that item)\n"
+                                f"   - new_value: (apply {operation} operation - extract value from conversation context)\n"
+                            )
+                    elif operation == 'set':
+                        if value_to_operate:
+                            context_addendum += f"   - new_value: '{value_to_operate}'\n"
+                        else:
+                            context_addendum += f"   - new_value: (extract from conversation context)\n"
+                    
+                    context_addendum += (
+                        f"\n2. After ALL updates complete, respond with:\n"
+                        f"   'Successfully updated {len(matching_items)} items: [list the items]'\n"
+                        f"\n❌ DO NOT:\n"
+                        f"   - Ask for confirmation again\n"
+                        f"   - List items again\n"
+                        f"   - Search for new items\n"
+                        f"   - Ask any questions\n"
+                        f"\n✅ DO:\n"
+                        f"   - Call update_cell for each item NOW\n"
+                        f"   - Execute the updates immediately\n"
+                    )
+                    user_content = context_addendum + "\n\n" + user_content
+                elif len(matching_items) == 1:
+                    # Only one match - still provide context but simpler
+                    item = matching_items[0]
+                    logger.info(f"Confirmation detected for single item: {item['product']}")
+                    # Let LLM handle single item updates normally
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content}
@@ -334,22 +750,301 @@ async def query_assistant(query: MaterialsQuery):
                         tool_response_content = json.dumps({"error": f"Invalid arguments: {exc}"})
                     else:
                         try:
+                            # Extract product hint from user's prompt for validation
+                            # Look for product identifiers in the prompt
+                            prompt_lower = query.prompt.lower()
+                            product_hint = None
+                            
+                            # Extract product hint from user's prompt
+                            # Priority: 1) Quoted strings (most specific), 2) Common identifiers, 3) Pattern matching
+                            quoted_matches = re.findall(r'["\']([^"\']+)["\']', query.prompt)
+                            if quoted_matches:
+                                # Use the first quoted string as product hint
+                                product_hint = quoted_matches[0].lower()
+                            else:
+                                # Check for common product identifier patterns
+                                # Look for patterns like "the [product]" or "[product] in [section]"
+                                product_patterns = [
+                                    r'the\s+([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)',
+                                    r'([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+in',
+                                    r'([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+row'
+                                ]
+                                for pattern in product_patterns:
+                                    matches = re.findall(pattern, query.prompt, re.IGNORECASE)
+                                    if matches:
+                                        candidate = matches[-1].lower()
+                                        # Filter out common words that aren't products
+                                        if candidate not in ['all', 'them', 'items', 'update', 'the', 'this', 'that']:
+                                            product_hint = candidate
+                                            break
+                            
+                            # Check for multiple matching items BEFORE updating
+                            materials_data = load_materials_data()
+                            matching_items = []
+                            
+                            if product_hint:
+                                matching_items = find_matching_items(materials_data, product_hint)
+                                
+                                # If multiple matches and user hasn't confirmed "all", return error asking for confirmation
+                                all_phrases = ['all of them', 'all items', f'all {product_hint}', 'yes, all', 'update all', 'all', 'yes all']
+                                user_confirmed_all = any(phrase in prompt_lower for phrase in all_phrases)
+                                
+                                if len(matching_items) > 1 and not user_confirmed_all:
+                                    # Multiple matches but no confirmation - ask for clarification
+                                    items_list = "\n".join([f"{i+1}. {m['section_label']} - {m['product']}" for i, m in enumerate(matching_items)])
+                                    tool_response_content = json.dumps({
+                                        "status": "needs_confirmation",
+                                        "message": f"I found {len(matching_items)} items matching '{product_hint}':\n{items_list}\n\nDo you want to update all of them, or a specific one? Please specify.",
+                                        "matching_items": [
+                                            {
+                                                "product": m['product'], 
+                                                "section": m['section_label'],
+                                                "section_id": m['section_id'],
+                                                "item_index": m['item_index']
+                                            } for m in matching_items
+                                        ],
+                                        "product_hint": product_hint,
+                                        "field_path": arguments["field_path"],
+                                        "requested_new_value": arguments["new_value"],
+                                        "operation_context": query.prompt  # Store what user originally requested
+                                    })
+                                    messages.append({
+                                        "role": "tool",
+                                        "tool_call_id": tool_call.id,
+                                        "content": tool_response_content
+                                    })
+                                    continue  # Skip the update, wait for user confirmation
+                            
+                            # Check if user confirmed "all" items should be updated
+                            
+                            if product_hint:
+                                # Check if prompt indicates "all" confirmation
+                                all_phrases = ['all of them', 'all items', f'all {product_hint}', 'yes, all', 'update all', 'all', 'yes all']
+                                if any(phrase in prompt_lower for phrase in all_phrases):
+                                    # Find all matching items
+                                    matching_items = find_matching_items(materials_data, product_hint)
+                                    if len(matching_items) > 1:
+                                        # Update all matching items
+                                        updated_items = []
+                                        errors = []
+                                        
+                                        for match in matching_items:
+                                            try:
+                                                # Read current value for this item
+                                                old_value_match = get_nested_value(match['item'], arguments["field_path"])
+                                                
+                                                # Apply the same modification to this item's current value
+                                                if isinstance(old_value_match, list) and isinstance(arguments["new_value"], list):
+                                                    # For arrays, apply the same operation
+                                                    # If adding, add to current array
+                                                    # If removing, remove from current array
+                                                    prompt_lower = query.prompt.lower()
+                                                    if "add" in prompt_lower or "insert" in prompt_lower:
+                                                        # Extract what to add
+                                                        quoted = re.findall(r'["\']([^"\']+)["\']', query.prompt)
+                                                        if quoted:
+                                                            url_to_add = quoted[-1]
+                                                            new_array = old_value_match + [url_to_add] if url_to_add not in old_value_match else old_value_match
+                                                        else:
+                                                            new_array = arguments["new_value"]  # Use provided value
+                                                    elif "remove" in prompt_lower or "get rid of" in prompt_lower or "delete" in prompt_lower:
+                                                        # Extract what to remove
+                                                        quoted = re.findall(r'["\']([^"\']+)["\']', query.prompt)
+                                                        if quoted:
+                                                            url_to_remove = quoted[-1]
+                                                            new_array = [x for x in old_value_match if x != url_to_remove]
+                                                        else:
+                                                            # Try to infer from the difference
+                                                            new_array = arguments["new_value"]
+                                                    else:
+                                                        new_array = arguments["new_value"]
+                                                else:
+                                                    new_array = arguments["new_value"]
+                                                
+                                                _, updated_item = update_cell(
+                                                    section_id=match['section_id'],
+                                                    item_index=match['item_index'],
+                                                    field_path=arguments["field_path"],
+                                                    new_value=new_array,
+                                                    expected_product_hint=product_hint
+                                                )
+                                                updated_items.append({
+                                                    'product': updated_item.get('product', ''),
+                                                    'section': match['section_label']
+                                                })
+                                            except Exception as e:
+                                                errors.append(f"{match['product']}: {str(e)}")
+                                                log_suspicious_activity(
+                                                    prompt=query.prompt,
+                                                    error_type="batch_update_error",
+                                                    error_detail=f"Error updating {match['product']}: {str(e)}",
+                                                    attempted_action={
+                                                        "section_id": match['section_id'],
+                                                        "item_index": match['item_index'],
+                                                        "field_path": arguments["field_path"],
+                                                        "new_value": arguments["new_value"]
+                                                    }
+                                                )
+                                        
+                                        # Return success with all updated items
+                                        tool_response_content = json.dumps({
+                                            "status": "success",
+                                            "updated_count": len(updated_items),
+                                            "updated_items": updated_items,
+                                            "errors": errors if errors else None,
+                                            "field_path": arguments["field_path"],
+                                            "batch_update": True
+                                        })
+                                        messages.append({
+                                            "role": "tool",
+                                            "tool_call_id": tool_call.id,
+                                            "content": tool_response_content
+                                        })
+                                        continue  # Skip the single update below
+                            
+                            # Single item update (default behavior)
                             _, updated_item = update_cell(
                                 section_id=arguments["section_id"],
                                 item_index=arguments["item_index"],
                                 field_path=arguments["field_path"],
-                                new_value=arguments["new_value"]
+                                new_value=arguments["new_value"],
+                                expected_product_hint=product_hint
                             )
                         except Exception as exc:
+                            # Log suspicious activity silently
+                            error_str = str(exc)
+                            error_type = "unknown_error"
+                            
+                            if "Product mismatch" in error_str:
+                                error_type = "product_mismatch"
+                            elif "no change" in error_str.lower() or "identical" in error_str.lower():
+                                error_type = "no_change_update"
+                            elif "array" in error_str.lower() and ("suspicious" in error_str.lower() or "unexpectedly" in error_str.lower()):
+                                error_type = "array_operation_error"
+                            
+                            log_suspicious_activity(
+                                prompt=query.prompt,
+                                error_type=error_type,
+                                error_detail=error_str,
+                                attempted_action={
+                                    "section_id": arguments.get("section_id"),
+                                    "item_index": arguments.get("item_index"),
+                                    "field_path": arguments.get("field_path"),
+                                    "new_value": arguments.get("new_value")
+                                }
+                            )
+                            
                             tool_response_content = json.dumps({"status": "error", "detail": str(exc)})
                         else:
+                            # WORST CASE SCENARIO: Check if update succeeded but might be wrong
+                            # This catches cases where validation passed but the action was still incorrect
+                            suspicious = False
+                            suspicious_reasons = []
+                            
+                            # Get the old value before update (we need to reload to check)
+                            data_check = load_materials_data()
+                            section_check = match_section(data_check.get('sections', []), arguments["section_id"])
+                            if section_check:
+                                items_check = section_check.get('items', [])
+                                if arguments["item_index"] < len(items_check):
+                                    item_before = items_check[arguments["item_index"]]
+                                    old_value_check = get_nested_value(item_before, arguments["field_path"])
+                                    
+                                    # Check 1: Verify product hint matches (if provided)
+                                    if product_hint:
+                                        updated_product = updated_item.get('product', '').lower()
+                                        hint_lower = product_hint.lower()
+                                        if hint_lower not in updated_product and updated_product not in hint_lower:
+                                            suspicious = True
+                                            suspicious_reasons.append(
+                                                f"Product mismatch: User mentioned '{product_hint}' but updated '{updated_item.get('product', '')}'"
+                                            )
+                                    
+                                    # Check 2: For array operations, verify the operation makes sense
+                                    if arguments.get("field_path", "").endswith("replacementUrls"):
+                                        prompt_lower = query.prompt.lower()
+                                        old_array = old_value_check if isinstance(old_value_check, list) else []
+                                        new_array = arguments.get("new_value", [])
+                                        
+                                        # Check if user asked to remove something
+                                        if "remove" in prompt_lower or "get rid of" in prompt_lower or "delete" in prompt_lower:
+                                            # Extract what they wanted to remove
+                                            url_to_remove = None
+                                            quoted = re.findall(r'["\']([^"\']+)["\']', query.prompt)
+                                            if quoted:
+                                                url_to_remove = quoted[-1]  # Usually the last quoted item
+                                            # Also try to extract from context (e.g., "hellocat123")
+                                            if not url_to_remove:
+                                                # Look for common patterns
+                                                url_pattern = r'\b([a-zA-Z0-9\-_\.]+(?:\.com|\.org|\.net|://|\d+))\b'
+                                                urls_found = re.findall(url_pattern, query.prompt)
+                                                if urls_found:
+                                                    url_to_remove = urls_found[-1]
+                                            
+                                            if url_to_remove and isinstance(old_array, list):
+                                                # Check if the URL they wanted to remove is still in the new array
+                                                if url_to_remove in old_array and url_to_remove in new_array:
+                                                    suspicious = True
+                                                    suspicious_reasons.append(
+                                                        f"⚠️ CRITICAL: Requested to remove '{url_to_remove}' but it's still in the array after update"
+                                                    )
+                                                # Check if they removed something that wasn't requested
+                                                if url_to_remove in old_array and url_to_remove not in new_array:
+                                                    # This is correct, but check if something unexpected was also removed
+                                                    removed_items = [x for x in old_array if x not in new_array]
+                                                    if len(removed_items) > 1 or (removed_items and removed_items[0] != url_to_remove):
+                                                        suspicious = True
+                                                        suspicious_reasons.append(
+                                                            f"⚠️ CRITICAL: Requested to remove '{url_to_remove}' but also removed: {removed_items}"
+                                                        )
+                                        
+                                        # Check if user asked to add something
+                                        elif "add" in prompt_lower:
+                                            url_to_add = None
+                                            quoted = re.findall(r'["\']([^"\']+)["\']', query.prompt)
+                                            if quoted:
+                                                url_to_add = quoted[-1]
+                                            if not url_to_add:
+                                                url_pattern = r'\b([a-zA-Z0-9\-_\.]+(?:\.com|\.org|\.net|://))\b'
+                                                urls_found = re.findall(url_pattern, query.prompt)
+                                                if urls_found:
+                                                    url_to_add = urls_found[-1]
+                                            
+                                            if url_to_add and isinstance(new_array, list):
+                                                if url_to_add not in new_array:
+                                                    suspicious = True
+                                                    suspicious_reasons.append(
+                                                        f"⚠️ CRITICAL: Requested to add '{url_to_add}' but it's not in the final array"
+                                                    )
+                            
+                            # If suspicious, log it explicitly as WORST CASE
+                            if suspicious:
+                                log_suspicious_activity(
+                                    prompt=query.prompt,
+                                    error_type="WORST_CASE_UNDETECTED_ERROR",
+                                    error_detail="🚨 CRITICAL: Update succeeded but appears to be INCORRECT. Validation did NOT catch this error.\n\n" + 
+                                               "\n".join(f"- {reason}" for reason in suspicious_reasons) +
+                                               f"\n\nOld value: {old_value_check}\nNew value: {arguments.get('new_value')}",
+                                    attempted_action={
+                                        "section_id": arguments["section_id"],
+                                        "item_index": arguments["item_index"],
+                                        "field_path": arguments["field_path"],
+                                        "new_value": arguments["new_value"],
+                                        "old_value": old_value_check,
+                                        "updated_product": updated_item.get('product', ''),
+                                        "expected_product_hint": product_hint
+                                    }
+                                )
+                            
                             tool_response_content = json.dumps({
                                 "status": "success",
                                 "section_id": arguments["section_id"],
                                 "item_index": arguments["item_index"],
                                 "field_path": arguments["field_path"],
                                 "new_value": arguments["new_value"],
-                                "updated_item": updated_item
+                                "updated_item": updated_item,
+                                "suspicious": suspicious,  # Flag for LLM to mention in response
+                                "suspicious_reasons": suspicious_reasons if suspicious else []
                             })
 
                 messages.append({
@@ -365,6 +1060,19 @@ async def query_assistant(query: MaterialsQuery):
             )
             final_message = final_response.choices[0].message
             answer = final_message.content
+            
+            # Check if any tool responses flagged suspicious activity
+            for msg in messages:
+                if msg.get("role") == "tool":
+                    try:
+                        tool_result = json.loads(msg.get("content", "{}"))
+                        if tool_result.get("suspicious"):
+                            # Add warning to answer if not already present
+                            if "⚠️" not in answer and "WARNING" not in answer.upper():
+                                warning = "\n\n⚠️ WARNING: The update completed, but there may be an issue. Please verify the result."
+                                answer = answer + warning if answer else warning
+                    except:
+                        pass
         else:
             answer = response_message.content
 

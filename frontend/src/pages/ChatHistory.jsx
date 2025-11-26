@@ -216,7 +216,7 @@ function ChatHistory() {
               {entries.map((entry) => (
                 <div key={entry.id} className="chat-entry" style={{ position: 'relative' }}>
                   <div className="chat-entry-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="chat-timestamp">{formatTimestamp(entry.timestamp)}</span>
+                <span className="chat-timestamp">{formatTimestamp(entry.timestamp)}</span>
                     <div style={{ display: 'flex', gap: '4px', zIndex: 10 }}>
                       <button
                         onClick={(e) => {
@@ -359,41 +359,41 @@ function ChatHistory() {
                         ×
                       </button>
                     </div>
-                  </div>
-                  
-                  <div className="chat-prompt">
-                    <div className="chat-label">{t('question')}:</div>
-                    <div className="chat-content">{entry.prompt}</div>
-                  </div>
+              </div>
+              
+              <div className="chat-prompt">
+                <div className="chat-label">{t('question')}:</div>
+                <div className="chat-content">{entry.prompt}</div>
+              </div>
 
-                  {entry.error ? (
-                    <div className="chat-response chat-error">
-                      <div className="chat-label">{t('error')}:</div>
-                      <div className="chat-content">{entry.error}</div>
-                    </div>
-                  ) : (
-                    <div className="chat-response">
-                      <div className="chat-label">{t('response')}:</div>
-                      <div className="chat-content">
-                        {(() => {
-                          // Handle both old format (string) and new format (object with en/fr)
-                          if (typeof entry.response === 'object' && entry.response !== null) {
-                            // New format: object with en and fr
-                            if (language === 'en') {
-                              return entry.response.en || entry.response.fr || '';
-                            } else {
-                              return entry.response.fr || entry.response.en || '';
-                            }
-                          } else {
-                            // Old format: just a string (fallback)
-                            return entry.response || '';
-                          }
-                        })()}
-                      </div>
-                    </div>
-                  )}
+              {entry.error ? (
+                <div className="chat-response chat-error">
+                  <div className="chat-label">{t('error')}:</div>
+                  <div className="chat-content">{entry.error}</div>
                 </div>
-              ))}
+              ) : (
+                <div className="chat-response">
+                  <div className="chat-label">{t('response')}:</div>
+                  <div className="chat-content">
+                    {(() => {
+                      // Handle both old format (string) and new format (object with en/fr)
+                      if (typeof entry.response === 'object' && entry.response !== null) {
+                        // New format: object with en and fr
+                        if (language === 'en') {
+                          return entry.response.en || entry.response.fr || '';
+                        } else {
+                          return entry.response.fr || entry.response.en || '';
+                        }
+                      } else {
+                        // Old format: just a string (fallback)
+                        return entry.response || '';
+                      }
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
             </div>
           )}
         </div>

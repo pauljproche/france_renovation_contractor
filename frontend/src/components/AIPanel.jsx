@@ -293,7 +293,7 @@ function AIPanel() {
     <aside className={`ai-panel ${!isAIPanelOpen ? 'ai-panel-hidden' : ''}`}>
       <div className="ai-panel-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-          <h3>{t('assistantLabel') || 'Assistant IA'}</h3>
+        <h3>{t('assistantLabel') || 'Assistant IA'}</h3>
           <div style={{ position: 'relative' }} ref={dropdownRef}>
             <button
               type="button"
