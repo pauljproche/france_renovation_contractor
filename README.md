@@ -37,7 +37,8 @@ Track Project Execution
    - Once complete, unlocks Tracking for that project
 4. **Tracking System** ✅ **Implemented** - Execution tracking and project management
    - Track materials, approvals, deliveries
-   - LLM-powered assistant with bilingual responses (English/French)
+   - LLM-powered AI agent with bilingual responses (English/French)
+   - Agent can query data and take actions (update approvals, validate items)
    - Chat history with language-aware display
    - Real-time data updates
    - Role-based access (Contractor, Client, Architect)
@@ -62,7 +63,7 @@ At any point, users can return to the Global Dashboard to switch between project
 
 ## Phase 2: Tracking System (Current Implementation)
 
-This repository currently contains the **Phase 2: Tracking System** implementation. The tracking system enables stakeholders to monitor project execution, track materials, manage approvals, and interact with an AI assistant for project queries.
+This repository currently contains the **Phase 2: Tracking System** implementation. The tracking system enables stakeholders to monitor project execution, track materials, manage approvals, and interact with an AI agent that can both answer questions and take actions on project data.
 
 ## Phase 2: Tracking System Goals
 
@@ -78,37 +79,39 @@ This repository currently contains the **Phase 2: Tracking System** implementati
 The tracking system is being developed in phases:
 
 ### Phase 2.1: Tracking Web Dashboard MVP
-- **Dashboard landing page** with at-a-glance metrics (orders pending, spend, deliveries) and a persistent LLM prompt card
+- **Dashboard landing page** with at-a-glance metrics (orders pending, spend, deliveries) and a persistent AI agent prompt card
 - **Dedicated materials view** hosting the tabular dataset (`materials.json`) with filters and deep links back to the dashboard
 - **Natural language query interface** allowing users to ask questions about:
   - What needs to be validated
   - What items need to be purchased
   - Pricing information
   - Timeline/scheduling
-- **LLM responses** based on the displayed tabular data
+- **AI agent responses** based on the displayed tabular data
+- **Agent actions** - agent can update data directly via function calls
 - **Role-based access** (contractor, client, architect, etc.)
 
 #### Phase 2.1 Tracking UI Layout
-- The landing page provides quick KPIs, recent alerts, and the “Ask the assistant” form so stakeholders know what’s available before prompting the LLM.
-- The materials page focuses on detailed tabular data; the assistant UI remains accessible (drawer/modal) for context-aware questions.
+- The landing page provides quick KPIs, recent alerts, and the "Ask the agent" form so stakeholders know what's available before prompting the AI agent.
+- The materials page focuses on detailed tabular data; the agent UI (AIPanel) remains accessible (drawer/modal) for context-aware queries and actions.
 - Navigation between the two views should be obvious (breadcrumb or primary nav) to keep discovery simple for new users.
 
 ### Phase 2.2: Tracking Backend Data Integration
 - **Backend API** to store and manage project data
 - **Database integration** for persistent storage
-- **LLM access to backend data** instead of webpage scraping
-- **Real-time data updates** reflected in LLM responses
+- **AI agent access to backend data** via function calling instead of webpage scraping
+- **Real-time data updates** reflected in agent responses and actions
 
 ### Phase 2.3: Tracking Zulip Chatbot Integration ✅ **Implemented**
-- **Zulip bot** (`@contractor_bot`) ✅
+- **Zulip bot** (`@contractor_bot`) - AI agent accessible via Zulip ✅
 - **Natural language queries** via Zulip mentions ✅
-- **LLM responses** based on backend data ✅
-- **Validation actions** - approve/reject items via chat ✅
+- **AI agent responses** based on backend data ✅
+- **Agent actions** - agent can take actions directly via chat ✅
   - "validate [item] as [role]" updates approval status
   - "approve [item] as client/cray" executes immediately
+  - "reject [item] as [role]" updates status to rejected
   - Handles confirmations and extracts product identifiers correctly
 - **Bilingual responses** (English and French) ✅
-- **Conversation context** - bot uses recent messages for better understanding ✅
+- **Conversation context** - agent uses recent messages for better understanding ✅
 - **Action item tracking** integrated with chat context (basic implementation)
 
 ### Phase 2.4: Tracking Task Management & To-Do Lists
@@ -199,27 +202,31 @@ The tracking system is being developed in phases:
 - Role-based access control
 - Real-time data synchronization
 
-### LLM Integration
+### AI Agent Integration
 - Natural language understanding for queries
+- Function calling capabilities (update_cell tool for data modifications)
 - Context-aware responses based on project data
+- Autonomous action-taking (validation updates, status changes)
 - Role-specific response formatting
 - Task extraction and parsing
 
 ### Zulip Integration ✅ **Implemented**
 - Bot account setup ✅
 - Message parsing and command handling ✅
-- LLM query processing ✅
+- AI agent query processing ✅
+- Agent action execution via function calls ✅
 - Response formatting for chat context ✅
   - Clean markdown formatting
   - HTML tag removal
   - Proper line breaks for lists and sections
   - Bilingual responses (EN/FR)
 - Action item detection and tracking ✅ (basic)
-- **Validation actions** ✅
+- **Agent validation actions** ✅
   - Approve/reject items via natural language
-  - Updates materials table directly
+  - Updates materials table directly via update_cell function
   - Handles product identifier extraction correctly
   - Conversation context awareness
+  - Data reloading on each query for latest information
 
 ### Data Structure
 - Project information
@@ -300,7 +307,7 @@ france_renovation_contractor/
 │   │   │   ├── Login.jsx               ✅ Authentication
 │   │   │   └── Landing.jsx             ✅ Landing page
 │   │   ├── components/
-│   │   │   ├── AIPanel.jsx             ✅ LLM assistant panel
+│   │   │   ├── AIPanel.jsx             ✅ AI agent interface panel
 │   │   │   ├── ProjectCard.jsx        ✅ Project card component
 │   │   │   ├── Layout.jsx              ✅ Main layout with sidebar
 │   │   │   └── ...
@@ -387,7 +394,7 @@ If you prefer to run services individually or need to set up the project from sc
 4. **Configure environment variables**
    - Create `backend/.env` file and add your configuration:
    ```bash
-   # Required for LLM assistant
+   # Required for AI agent
    OPENAI_API_KEY=sk-proj-your-key-here
    OPENAI_MODEL=gpt-4o-mini
    
@@ -433,7 +440,7 @@ If you prefer to run services individually or need to set up the project from sc
 
 ### Zulip Bot Setup (Optional)
 
-The Zulip bot allows you to interact with the assistant via Zulip chat. To use it:
+The Zulip bot allows you to interact with the AI agent via Zulip chat. To use it:
 
 1. **Configure environment variables**
    - Create or edit `backend/.env` and add your Zulip credentials:
@@ -469,10 +476,10 @@ If you prefer to run services in separate terminals:
 
 > **Tip**: Use the startup script (`./start_app.sh` or `python start_app.py`) to run all three services at once!
 
-### Assistant-Powered Table Edits & Reloading
+### AI Agent-Powered Table Edits & Reloading
 
-- The LLM assistant can now edit `data/materials.json` directly by calling the backend `update_cell` function. When the assistant responds with a successful update, the Materials table automatically refreshes via a shared `materials-data-reload` event so every visible view stays in sync.
-- The Materials page header includes a **Reload data** button for manual refreshes. This forces the React hook to re-fetch `/materials.json` (with cache busting) in case you made changes outside the assistant or while experimenting with data files.
+- The AI agent can now edit `data/materials.json` directly by calling the backend `update_cell` function (function calling). When the agent responds with a successful update, the Materials table automatically refreshes via a shared `materials-data-reload` event so every visible view stays in sync.
+- The Materials page header includes a **Reload data** button for manual refreshes. This forces the React hook to re-fetch `/materials.json` (with cache busting) in case you made changes outside the agent or while experimenting with data files.
 - Any component that needs fresh materials can call the exported `reload()` helper from `useMaterialsData`. It triggers a local refetch and broadcasts the reload event so other mounts update themselves without a full page reload.
 
 ### System Prompt Management
@@ -494,10 +501,12 @@ If you prefer to run services in separate terminals:
   - Project selection and navigation
 - **Tracking Dashboard** with KPIs and metrics
 - **Materials tracking table** with editable fields
-- **LLM-powered assistant** for project queries
+- **LLM-powered AI agent** for project queries and actions
+  - Can query data and take actions (update approvals, validate items)
   - Bilingual responses (generates both English and French)
   - Language-aware display based on UI language toggle
   - Chat history with language switching support
+  - Function calling for autonomous data updates
 - **Chat history** with conversation tracking
   - Automatically cleared on logout/login for privacy
   - Language-aware response display
