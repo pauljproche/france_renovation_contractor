@@ -99,11 +99,17 @@ The tracking system is being developed in phases:
 - **LLM access to backend data** instead of webpage scraping
 - **Real-time data updates** reflected in LLM responses
 
-### Phase 2.3: Tracking Zulip Chatbot Integration
-- **Zulip bot** (`@contractor_bot` or similar)
-- **Natural language queries** via Zulip mentions
-- **LLM responses** based on backend data
-- **Action item tracking** integrated with chat context
+### Phase 2.3: Tracking Zulip Chatbot Integration ✅ **Implemented**
+- **Zulip bot** (`@contractor_bot`) ✅
+- **Natural language queries** via Zulip mentions ✅
+- **LLM responses** based on backend data ✅
+- **Validation actions** - approve/reject items via chat ✅
+  - "validate [item] as [role]" updates approval status
+  - "approve [item] as client/cray" executes immediately
+  - Handles confirmations and extracts product identifiers correctly
+- **Bilingual responses** (English and French) ✅
+- **Conversation context** - bot uses recent messages for better understanding ✅
+- **Action item tracking** integrated with chat context (basic implementation)
 
 ### Phase 2.4: Tracking Task Management & To-Do Lists
 - **Role-based to-do lists** ("What do I need to do?")
@@ -165,9 +171,17 @@ The tracking system is being developed in phases:
 **User**: Clicks checkbox to complete "Order tiles for bathroom"
 **System**: Marks task complete and shows link to original chat message where tiles were discussed.
 
-### Use Case 5: Zulip Integration
-**User**: `@contractor_bot What's the status of the living room renovation?`
-**Bot**: Responds with current status, pending items, and next steps.
+### Use Case 5: Zulip Integration - Query
+**User**: `@contractor_bot What items need to be validated by the client?`
+**Bot**: Responds with formatted list of items requiring validation, organized by section.
+
+### Use Case 6: Zulip Integration - Validation Action
+**User**: `@contractor_bot can you validate the cathat item in the cuisine as a client?`
+**Bot**: Updates `approvals.client.status` to "approved" and confirms the update.
+
+### Use Case 7: Zulip Integration - Rejection
+**User**: `@contractor_bot reject the cathat item as client`
+**Bot**: Updates `approvals.client.status` to "rejected" and confirms the update.
 
 ## Technical Requirements
 
@@ -191,12 +205,21 @@ The tracking system is being developed in phases:
 - Role-specific response formatting
 - Task extraction and parsing
 
-### Zulip Integration
-- Bot account setup
-- Message parsing and command handling
-- LLM query processing
-- Response formatting for chat context
-- Action item detection and tracking
+### Zulip Integration ✅ **Implemented**
+- Bot account setup ✅
+- Message parsing and command handling ✅
+- LLM query processing ✅
+- Response formatting for chat context ✅
+  - Clean markdown formatting
+  - HTML tag removal
+  - Proper line breaks for lists and sections
+  - Bilingual responses (EN/FR)
+- Action item detection and tracking ✅ (basic)
+- **Validation actions** ✅
+  - Approve/reject items via natural language
+  - Updates materials table directly
+  - Handles product identifier extraction correctly
+  - Conversation context awareness
 
 ### Data Structure
 - Project information
@@ -256,9 +279,13 @@ france_renovation_contractor/
 │   │   ├── components/       # UI components
 │   │   └── ...
 ├── backend/                 # FastAPI backend (Phase 2: Tracking API)
-├── zulip_bot/               # Zulip chatbot integration (Phase 2.3+)
+│   ├── prompts/             # System prompts for LLM assistant
+│   │   ├── system_prompt.md # Main system prompt (isolated for easy editing)
+│   │   └── README.md        # Prompts documentation
+│   └── zulip_bot/           # Zulip chatbot integration (Phase 2.3) ✅
 ├── data/                    # Sample data and schemas
-│   └── materials.json       # Current tracking data structure
+│   ├── materials.json       # Current tracking data structure
+│   └── edit-history.json    # Edit history tracking
 └── docs/                    # Additional documentation
 
 # Current structure (Phase 2):
@@ -283,9 +310,16 @@ france_renovation_contractor/
 │   │   │   └── AppContext.jsx          ✅ Language, role, theme state
 │   │   └── ...
 ├── backend/
-│   └── main.py                         ✅ FastAPI backend with LLM integration
+│   ├── main.py                         ✅ FastAPI backend with LLM integration
+│   ├── prompts/
+│   │   └── system_prompt.md            ✅ Isolated system prompt
+│   └── zulip_bot/
+│       ├── bot.py                      ✅ Zulip bot implementation
+│       ├── config.py                  ✅ Configuration management
+│       └── api_client.py              ✅ API client for backend
 └── data/
     ├── materials.json                  ✅ Sample materials data
+    ├── edit-history.json               ✅ Edit history tracking
     └── materials-pending-approval.json ✅ Demo project data
 
 # Future structure with Phase 1:
@@ -441,6 +475,14 @@ If you prefer to run services in separate terminals:
 - The Materials page header includes a **Reload data** button for manual refreshes. This forces the React hook to re-fetch `/materials.json` (with cache busting) in case you made changes outside the assistant or while experimenting with data files.
 - Any component that needs fresh materials can call the exported `reload()` helper from `useMaterialsData`. It triggers a local refetch and broadcasts the reload event so other mounts update themselves without a full page reload.
 
+### System Prompt Management
+
+- **Isolated system prompt** - The LLM system prompt is stored in `backend/prompts/system_prompt.md` for easy editing and version control
+- Edit the prompt directly without touching Python code
+- Changes take effect on next request (with `--reload` mode)
+- Supports markdown formatting for better readability
+- See `backend/prompts/README.md` for more details
+
 ## Implementation Status
 
 ### ✅ Completed (Phase 2: Tracking)
@@ -476,6 +518,12 @@ If you prefer to run services in separate terminals:
   - Queries backend API for LLM responses
   - Supports both stream and private messages
   - Integrated with startup script for easy deployment
+  - **Validation actions** - Can approve/reject items directly via chat commands
+  - **System prompt isolation** - Prompt stored in `backend/prompts/system_prompt.md` for easy editing
+  - **Improved formatting** - Clean markdown formatting, HTML tag removal, proper line breaks
+  - **Product identifier extraction** - Correctly handles complex requests like "validate X in Y as Z"
+  - **Confirmation handling** - Properly extracts context from conversation history
+  - **Table updates** - Bot can update materials table directly (approval status, etc.)
 
 ### 📋 Planned (Creating Devis - Phase 1)
 - Devis creation interface (HEMEA-like)
