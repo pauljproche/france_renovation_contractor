@@ -216,17 +216,21 @@ The tracking system is being developed in phases:
 - AI agent query processing ✅
 - Agent action execution via function calls ✅
 - Response formatting for chat context ✅
+  - Handles EN:/FR: format markers from system prompt
   - Clean markdown formatting
-  - HTML tag removal
+  - HTML tag removal (per system prompt requirements)
   - Proper line breaks for lists and sections
-  - Bilingual responses (EN/FR)
+  - Bilingual responses (EN/FR) with proper separation
+  - Formatting aligned with refactored system prompt
 - Action item detection and tracking ✅ (basic)
 - **Agent validation actions** ✅
   - Approve/reject items via natural language
   - Updates materials table directly via update_cell function
-  - Handles product identifier extraction correctly
+  - Improved product identifier extraction (matches system prompt logic)
+  - Better handling of "validate [item] as [role]" patterns
   - Conversation context awareness
   - Data reloading on each query for latest information
+  - Logic synchronized with web-based agent
 
 ### Data Structure
 - Project information
@@ -253,10 +257,12 @@ Once a devis is marked complete, Tracking becomes available for that project.
 
 ### Phase 2 Enhancements
 - **Multi-language support** (French/English) ✅ **Fully implemented**
-  - UI language toggle (English/French)
-  - LLM generates bilingual responses (English and French)
-  - Chat history displays in selected language
-  - Language preference persists across sessions
+  - UI language toggle (English/French) with persistent preference (localStorage)
+  - LLM generates bilingual responses (English and French) with EN:/FR: format markers
+  - **AI Panel**: Displays responses in the currently selected language (matches language toggle)
+  - **Chat History**: Displays both languages for reference (English and French sections)
+  - Language preference persists across sessions and page refreshes
+  - Backend receives language parameter to optimize responses
 - **Document upload and parsing** (plans, invoices, permits)
 - **Image recognition** for progress tracking
 - **Automated notifications** for deadlines and pending tasks
@@ -485,9 +491,12 @@ If you prefer to run services in separate terminals:
 ### System Prompt Management
 
 - **Isolated system prompt** - The LLM system prompt is stored in `backend/prompts/system_prompt.md` for easy editing and version control
+- **Recently refactored** - Complete reorganization for better clarity, maintainability, and structure
+- **Clear organization**: Core Principles → Finding Items → Validation Actions → Questions → Formatting
 - Edit the prompt directly without touching Python code
 - Changes take effect on next request (with `--reload` mode)
 - Supports markdown formatting for better readability
+- **Synchronized logic** - Both web agent and Zulip bot use the same prompt for consistent behavior
 - See `backend/prompts/README.md` for more details
 
 ## Implementation Status
@@ -503,13 +512,17 @@ If you prefer to run services in separate terminals:
 - **Materials tracking table** with editable fields
 - **LLM-powered AI agent** for project queries and actions
   - Can query data and take actions (update approvals, validate items)
-  - Bilingual responses (generates both English and French)
-  - Language-aware display based on UI language toggle
-  - Chat history with language switching support
+  - Bilingual responses (generates both English and French with EN:/FR: format)
+  - **Language-aware display**: AI panel shows only the selected language, chat history shows both
+  - Language preference sent to backend for optimized responses
+  - Chat history with dual-language display for reference
   - Function calling for autonomous data updates
+  - Improved product identifier extraction for validation actions
 - **Chat history** with conversation tracking
   - Automatically cleared on logout/login for privacy
-  - Language-aware response display
+  - **Dual-language display**: Shows both English and French responses for reference
+  - Organized by session with timestamps
+  - Save prompts to prompt library functionality
 - **Role-based access** (Contractor, Client, Architect)
 - **Multi-language UI support** (French/English) with language toggle
 - **Theme support** (Purple/Blue themes)
@@ -522,17 +535,35 @@ If you prefer to run services in separate terminals:
 - Advanced task management features (Phase 2.4)
 
 ### ✅ Recently Completed
+- **Language toggle improvements** ✅
+  - Language preference persists to localStorage
+  - AI panel displays only the selected language (EN/FR toggle)
+  - Chat history displays both languages for reference
+  - Backend receives language parameter for optimized responses
+  - Response format uses EN:/FR: markers for proper parsing
+- **System prompt refactoring** ✅
+  - Complete reorganization for better clarity and maintainability
+  - Improved structure: Core Principles → Finding Items → Actions → Questions → Formatting
+  - Enhanced validation action instructions
+  - Better role extraction guidance
+  - Clearer confirmation handling process
+- **Validation action fixes** ✅
+  - Improved product hint extraction from user prompts
+  - Better handling of "validate [item] as [role]" patterns
+  - Enhanced matching logic for product identifiers
+  - More robust error handling and validation
 - **Zulip chatbot integration (Phase 2.3)** ✅
   - Bot responds to mentions in Zulip
   - Queries backend API for LLM responses
   - Supports both stream and private messages
   - Integrated with startup script for easy deployment
   - **Validation actions** - Can approve/reject items directly via chat commands
-  - **System prompt isolation** - Prompt stored in `backend/prompts/system_prompt.md` for easy editing
-  - **Improved formatting** - Clean markdown formatting, HTML tag removal, proper line breaks
+  - **System prompt alignment** - Bot logic matches refactored system prompt
+  - **Improved formatting** - Handles EN:/FR: format markers, clean markdown, HTML tag removal
   - **Product identifier extraction** - Correctly handles complex requests like "validate X in Y as Z"
   - **Confirmation handling** - Properly extracts context from conversation history
   - **Table updates** - Bot can update materials table directly (approval status, etc.)
+  - **Response format handling** - Properly processes bilingual responses with format markers
 
 ### 📋 Planned (Creating Devis - Phase 1)
 - Devis creation interface (HEMEA-like)
