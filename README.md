@@ -396,7 +396,7 @@ If you prefer to run services individually or need to set up the project from sc
    ```bash
    # Required for AI agent
    OPENAI_API_KEY=sk-proj-your-key-here
-   OPENAI_MODEL=gpt-4o-mini
+   OPENAI_MODEL=gpt-4o
    
    # Optional: Zulip bot configuration (if using Zulip integration)
    ZULIP_EMAIL=your-bot@example.com

@@ -40,7 +40,7 @@ app.add_middleware(
 # Initialize OpenAI client
 api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=api_key) if api_key else None
-default_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+default_model = os.getenv("OPENAI_MODEL", "gpt-4o")
 
 
 def load_materials_data() -> dict:
@@ -415,7 +415,29 @@ async def query_assistant(query: MaterialsQuery):
         validation_instruction = ""
         prompt_lower = query.prompt.lower()
         if any(keyword in prompt_lower for keyword in ["what items need", "what needs to be validated", "items requiring", "needs validation"]):
-            validation_instruction = "\n\n⚠️ CRITICAL INSTRUCTION: You MUST check EVERY item in EVERY section. Do not stop after finding one item. List ALL items that need validation (status: rejected, change_order, null, or any non-approved status). Count them carefully.\n\n"
+            # Detect which role is mentioned in the query - prioritize explicit "by [role]" patterns
+            role_to_check = None
+            field_path = None
+            
+            # Check for explicit "by cray" or "by client" patterns first
+            if "by cray" in prompt_lower:
+                role_to_check = "cray"
+                field_path = "approvals.cray.status"
+            elif "by client" in prompt_lower:
+                role_to_check = "client"
+                field_path = "approvals.client.status"
+            # Fallback: check if "cray" or "client" appears in the query
+            elif "cray" in prompt_lower and "client" not in prompt_lower:
+                role_to_check = "cray"
+                field_path = "approvals.cray.status"
+            elif "client" in prompt_lower and "cray" not in prompt_lower:
+                role_to_check = "client"
+                field_path = "approvals.client.status"
+            
+            if role_to_check:
+                validation_instruction = f"\n\n🚨🚨🚨 CRITICAL ROLE-SPECIFIC INSTRUCTION 🚨🚨🚨\n\nThe user is asking about **{role_to_check.upper()}** validation. You MUST:\n1. Check the `{field_path}` field for EVERY item in EVERY section\n2. DO NOT check `approvals.client.status` if the query mentions cray\n3. DO NOT check `approvals.cray.status` if the query mentions client\n4. List ALL items where `{field_path}` is: rejected, change_order, null, or any non-approved status\n5. Count them carefully\n\nIf you check the wrong field (e.g., checking client status when asked about cray), your response will be INCORRECT.\n\n"
+            else:
+                validation_instruction = "\n\n⚠️ CRITICAL INSTRUCTION: You MUST check EVERY item in EVERY section. Do not stop after finding one item. List ALL items that need validation (status: rejected, change_order, null, or any non-approved status). Count them carefully.\n\n"
         
         user_content = f"Materials data:\n{materials_text}{custom_tables_info}{validation_instruction}Question: {query.prompt}"
 

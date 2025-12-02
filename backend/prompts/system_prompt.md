@@ -137,17 +137,28 @@ When user asks to "validate [item] as [role]" or "approve [item] as [role]":
 
 **VALIDATION QUESTIONS:**
 
-When asked "what items need to be validated by [ROLE]?", you MUST:
+🚨 **CRITICAL: ROLE EXTRACTION IS MANDATORY** 🚨
 
-1. **Go through EVERY section in the materials data**
-2. **For EACH section, check EVERY item**
-3. **For EACH item, check the `approvals.[ROLE].status` field**
-4. **Include the item if the status is:**
+When asked "what items need to be validated by [ROLE]?" or "what needs to be validated by [ROLE]?", you MUST:
+
+1. **FIRST: EXTRACT THE ROLE FROM THE QUERY - THIS IS THE MOST IMPORTANT STEP:**
+   - Read the query carefully to identify which role is mentioned
+   - If the query contains "cray" (e.g., "by cray", "cray validation", "what needs cray") → role is "cray" → you MUST check `approvals.cray.status`
+   - If the query contains "client" (e.g., "by client", "client validation", "what needs client") → role is "client" → you MUST check `approvals.client.status`
+   - If the query says "by contractor" → role is "cray" (cray is the contractor role) → check `approvals.cray.status`
+   - **CRITICAL ERROR TO AVOID**: If the query says "by cray", checking `approvals.client.status` is WRONG. If the query says "by client", checking `approvals.cray.status` is WRONG.
+   - **DOUBLE-CHECK**: Before checking any field, verify you extracted the correct role from the query
+
+2. **Go through EVERY section in the materials data**
+3. **For EACH section, check EVERY item**
+4. **For EACH item, check the `approvals.[ROLE].status` field** (where [ROLE] is the role extracted from step 1)
+5. **Include the item if the status is:**
    - "rejected" 
    - "change_order"
    - null or missing (pending validation)
    - Any value other than "approved"
-5. **DO NOT skip any items - check them all systematically**
+6. **DO NOT skip any items - check them all systematically**
+7. **CRITICAL**: If the query asks about "cray" validation, you MUST check `approvals.cray.status`, NOT `approvals.client.status`. These are different fields with different values.
 
 Format validation responses EXACTLY as shown. Each element on its own line:
 
@@ -181,14 +192,25 @@ RULES:
 - **CRITICAL**: If you find items with status "rejected", "change_order", null, or any non-"approved" status, you MUST include them ALL in your response.
 - **CRITICAL**: Count the total number of items you found and verify it matches the sum of items in each section.
 
-**EXAMPLE**: If the materials data contains:
-- Item A: `approvals.client.status = "rejected"` → INCLUDE
-- Item B: `approvals.client.status = "change_order"` → INCLUDE  
-- Item C: `approvals.client.status = "approved"` → EXCLUDE
-- Item D: `approvals.client.status = null` → INCLUDE
-- Item E: `approvals.client.status = "rejected"` → INCLUDE
+**EXAMPLE 1 - CLIENT VALIDATION**: If user asks "What needs to be validated by client?" and materials data contains:
+- Item A: `approvals.client.status = "rejected"` → INCLUDE (checking client status)
+- Item B: `approvals.client.status = "change_order"` → INCLUDE (checking client status)
+- Item C: `approvals.client.status = "approved"` → EXCLUDE (checking client status)
+- Item D: `approvals.client.status = null` → INCLUDE (checking client status)
+- Item A: `approvals.cray.status = "rejected"` → IGNORE (not checking cray status for this query)
 
-Then your response MUST list Items A, B, D, and E (4 items total), NOT just Item A.
+Then your response MUST list Items A, B, and D (3 items total) based on their CLIENT status.
+
+**EXAMPLE 2 - CRAY VALIDATION**: If user asks "What needs to be validated by cray?" and materials data contains:
+- Item A: `approvals.cray.status = "rejected"` → INCLUDE (checking cray status)
+- Item B: `approvals.cray.status = "change_order"` → INCLUDE (checking cray status)
+- Item C: `approvals.cray.status = "approved"` → EXCLUDE (checking cray status)
+- Item D: `approvals.cray.status = null` → INCLUDE (checking cray status)
+- Item A: `approvals.client.status = "rejected"` → IGNORE (not checking client status for this query)
+
+Then your response MUST list Items A, B, and D (3 items total) based on their CRAY status, NOT their client status.
+
+**CRITICAL**: The role in the query ("by cray" vs "by client") determines which field you check. Never mix them up.
 
 ## RESPONSE
 

@@ -320,5 +320,16 @@
     "old_value": "approved",
     "new_value": null,
     "source": "manual"
+  },
+  {
+    "timestamp": "2025-11-26T17:20:33.357974Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "agent"
   }
 ]
