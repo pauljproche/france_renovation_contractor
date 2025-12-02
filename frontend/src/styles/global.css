@@ -136,6 +136,8 @@ table {
 .role-switcher {
   display: flex;
   align-items: center;
+  position: relative;
+  gap: 4px;
 }
 
 .role-select {
@@ -157,6 +159,253 @@ table {
   outline: none;
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.add-role-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #6b7280;
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.add-role-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #111827;
+}
+
+.add-role-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 12px;
+  z-index: 1000;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.add-role-input {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  width: 100%;
+}
+
+.add-role-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.add-role-error {
+  color: #dc2626;
+  font-size: 0.75rem;
+  margin-top: -4px;
+}
+
+.add-role-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.add-role-confirm-btn {
+  padding: 6px 12px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex: 1;
+}
+
+.add-role-confirm-btn:hover {
+  background: #1d4ed8;
+}
+
+.add-role-cancel-btn {
+  padding: 6px 12px;
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+}
+
+.add-role-cancel-btn:hover {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.custom-roles-list {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.custom-roles-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.custom-role-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: #f9fafb;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  font-size: 0.875rem;
+}
+
+.custom-role-item:last-child {
+  margin-bottom: 0;
+}
+
+.remove-role-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 50%;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.remove-role-btn:hover {
+  background: #dc2626;
+  color: white;
+}
+
+/* Delete Role Modal */
+.delete-role-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.delete-role-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.delete-role-modal h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 12px 0;
+}
+
+.delete-role-modal p {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.delete-role-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  margin-bottom: 24px;
+  box-sizing: border-box;
+}
+
+.delete-role-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.delete-role-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.delete-role-confirm-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.delete-role-confirm-btn:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.delete-role-confirm-btn:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.delete-role-cancel-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-role-cancel-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
 }
 
 .language-toggle-btn {
@@ -845,6 +1094,65 @@ table {
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.chantier-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.chantier-filter-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.chantier-filter-select {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.875rem;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  min-width: 200px;
+}
+
+.chantier-filter-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.chantier-filter-clear {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 50%;
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.chantier-filter-clear:hover {
+  background: #dc2626;
+  color: white;
 }
 
 .table-controls-right {
@@ -977,6 +1285,7 @@ table {
 }
 
 .client-approve-btn,
+.client-alternative-btn,
 .client-reject-btn {
   padding: 6px 12px;
   border-radius: 6px;
@@ -998,6 +1307,17 @@ table {
   transform: translateY(-1px);
 }
 
+.client-alternative-btn {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.client-alternative-btn:hover:not(:disabled) {
+  background: #fde68a;
+  transform: translateY(-1px);
+}
+
 .client-reject-btn {
   background: #fef2f2;
   border-color: #ef4444;
@@ -1010,6 +1330,7 @@ table {
 }
 
 .client-approve-btn:disabled,
+.client-alternative-btn:disabled,
 .client-reject-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -1407,11 +1728,42 @@ table {
 }
 
 .sortable-header {
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  position: relative;
 }
 
 .sortable-header:hover {
   background-color: #f3f4f6;
+}
+
+.sortable-header {
+  cursor: grab;
+}
+
+.sortable-header:active {
+  cursor: grabbing;
+}
+
+.sortable-header.dragging {
+  opacity: 0.5;
+  cursor: grabbing !important;
+}
+
+.sortable-header.drag-over {
+  border-left: 3px solid #2563eb;
+  background-color: #eff6ff;
+  position: relative;
+}
+
+.sortable-header.drag-over::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #2563eb;
+  z-index: 1;
 }
 
 .materials-table td:has(.delete-row-btn) {
@@ -1497,6 +1849,11 @@ table {
 .tag.rejected {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.tag.alternative {
+  background: #fef3c7;
+  color: #92400e;
 }
 
 .tag.change_order {
@@ -2956,5 +3313,254 @@ table {
   color: #6b7280;
   margin: 0;
   line-height: 1.5;
+}
+
+/* Create Devis Page */
+.create-devis-page {
+  padding: 24px;
+}
+
+.devis-controls {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.action-dropdown-container {
+  position: relative;
+}
+
+.action-dropdown-toggle {
+  padding: 10px 16px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-dropdown-toggle:hover {
+  background: #1d4ed8;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.action-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  min-width: 200px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.action-dropdown-item {
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: #111827;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  text-align: left;
+}
+
+.action-dropdown-item:hover {
+  background: #f3f4f6;
+}
+
+.room-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.room-selector label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.room-select {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: white;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  min-width: 150px;
+}
+
+.room-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.add-room-btn {
+  padding: 10px 16px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.add-room-btn:hover {
+  background: #059669;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.rooms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.room-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease;
+}
+
+.room-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.room-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.room-card-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.remove-room-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 50%;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.remove-room-btn:hover {
+  background: #dc2626;
+  color: white;
+}
+
+.room-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.no-actions {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  font-style: italic;
+  margin: 0;
+  padding: 16px 0;
+  text-align: center;
+}
+
+.action-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+}
+
+.action-label {
+  font-size: 0.875rem;
+  color: #111827;
+  font-weight: 500;
+}
+
+.remove-action-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 50%;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.remove-action-btn:hover {
+  background: #dc2626;
+  color: white;
+}
+
+/* Purple theme adjustments for Create Devis */
+.theme-purple .action-dropdown-toggle {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.theme-purple .action-dropdown-toggle:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+}
+
+.theme-purple .add-room-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.theme-purple .add-room-btn:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+/* Blue theme adjustments for Create Devis */
+.theme-blue .action-dropdown-toggle {
+  background: #2563eb;
+}
+
+.theme-blue .action-dropdown-toggle:hover {
+  background: #1d4ed8;
 }
 

@@ -6,7 +6,7 @@ import { logEdit } from '../services/editHistory.js';
 
 function ClientValidation() {
   const { t, language } = useTranslation();
-  const { role } = useRole();
+  const { role, customRoles } = useRole();
   const { data, loading, error, updateMaterials } = useMaterialsData();
   const [processingKeys, setProcessingKeys] = useState(() => new Set());
 
@@ -31,32 +31,66 @@ function ClientValidation() {
     data.sections.forEach((section, sectionIndex) => {
       section.items.forEach((item, itemIndex) => {
         if (item?.approvals?.client?.sentForValidation) {
-          items.push({
-            sectionIndex,
-            itemIndex,
-            sectionId: section.id,
-            sectionLabel: section.label,
-            product: item.product,
-            reference: item.reference,
-            priceTTC: item?.price?.ttc,
-            clientStatus: item?.approvals?.client?.status,
-            clientNote: item?.approvals?.client?.note,
-            sentAt: item?.approvals?.client?.sentAt,
-            replacementUrls: normalizeReplacementUrls(item),
-            key: `${section.id ?? section.label ?? sectionIndex}::${itemIndex}`
-          });
+          // Role-based filtering
+          const chantier = item.chantier || '';
+          let shouldInclude = true;
+
+          // If role is Alexis Roche, only show items with "Alexis Roche" in chantier
+          if (role === ROLES.ALEXIS_ROCHE) {
+            shouldInclude = chantier.toLowerCase().includes('alexis roche');
+          }
+          // If role is Paul Roche, only show items with "Paul Roche" in chantier
+          else if (role === ROLES.PAUL_ROCHE) {
+            shouldInclude = chantier.toLowerCase().includes('paul roche');
+          }
+          // For custom roles, check if the role name appears in the chantier
+          else if (role && !Object.values(ROLES).includes(role)) {
+            // This is a custom role - find the role name and check if it's in the chantier
+            const customRole = customRoles.find(r => r.id === role);
+            if (customRole) {
+              // Extract first and last name from custom role name (e.g., "Emmanuel Roche" -> "Emmanuel Roche")
+              const roleName = customRole.name;
+              // Check if the role name appears in the chantier
+              shouldInclude = chantier.toLowerCase().includes(roleName.toLowerCase());
+            } else {
+              // Custom role not found, show everything
+              shouldInclude = true;
+            }
+          }
+          // CLIENT role can see everything (global client)
+          // CONTRACTOR and ARCHITECT can see everything
+          // Other roles see everything by default
+
+          if (shouldInclude) {
+            items.push({
+              sectionIndex,
+              itemIndex,
+              sectionId: section.id,
+              sectionLabel: section.label,
+              product: item.product,
+              reference: item.reference,
+              chantier: item.chantier,
+              priceTTC: item?.price?.ttc,
+              clientStatus: item?.approvals?.client?.status,
+              clientNote: item?.approvals?.client?.note,
+              sentAt: item?.approvals?.client?.sentAt,
+              replacementUrls: normalizeReplacementUrls(item),
+              key: `${section.id ?? section.label ?? sectionIndex}::${itemIndex}`
+            });
+          }
         }
       });
     });
 
     return items;
-  }, [data]);
+  }, [data, role, customRoles]);
 
   const statusLabels = {
     approved: t('approved'),
     change_order: t('changeOrder'),
     pending: t('pending'),
     rejected: t('rejected'),
+    alternative: t('alternative') || 'Alternative',
     supplied_by: t('suppliedBy')
   };
 
@@ -75,13 +109,54 @@ function ClientValidation() {
   };
 
   const handleClientDecision = async (item, decision) => {
-    if (role !== ROLES.CLIENT || !data) {
+    // Allow CLIENT, ALEXIS_ROCHE, PAUL_ROCHE, and custom roles to make decisions
+    const isStandardClientRole = role === ROLES.CLIENT || role === ROLES.ALEXIS_ROCHE || role === ROLES.PAUL_ROCHE;
+    const isCustomRole = role && !Object.values(ROLES).includes(role);
+    const canValidate = isStandardClientRole || isCustomRole;
+    
+    if (!canValidate || !data) {
       return;
+    }
+
+    const chantier = item.chantier || '';
+
+    // Additional check: Alexis Roche can only validate his own items
+    if (role === ROLES.ALEXIS_ROCHE) {
+      if (!chantier.toLowerCase().includes('alexis roche')) {
+        alert(t('clientValidationUnauthorized') || 'You can only validate items for your own projects.');
+        return;
+      }
+    }
+    // Additional check: Paul Roche can only validate his own items
+    else if (role === ROLES.PAUL_ROCHE) {
+      if (!chantier.toLowerCase().includes('paul roche')) {
+        alert(t('clientValidationUnauthorized') || 'You can only validate items for your own projects.');
+        return;
+      }
+    }
+    // Additional check: Custom roles can only validate their own items
+    else if (isCustomRole) {
+      const customRole = customRoles.find(r => r.id === role);
+      if (customRole) {
+        const roleName = customRole.name;
+        if (!chantier.toLowerCase().includes(roleName.toLowerCase())) {
+          alert(t('clientValidationUnauthorized') || 'You can only validate items for your own projects.');
+          return;
+        }
+      }
     }
 
     let replacementUrlInput;
     if (decision === 'rejected') {
       const input = window.prompt(t('clientReplacementPrompt'));
+      if (input !== null) {
+        const trimmed = input.trim();
+        if (trimmed.length > 0) {
+          replacementUrlInput = trimmed;
+        }
+      }
+    } else if (decision === 'alternative') {
+      const input = window.prompt(t('clientAlternativePrompt') || 'Please provide an alternative URL for this item:');
       if (input !== null) {
         const trimmed = input.trim();
         if (trimmed.length > 0) {
@@ -192,19 +267,21 @@ function ClientValidation() {
               <thead>
                 <tr>
                   <th>{t('section')}</th>
+                  <th>{t('chantier') || 'Chantier / Construction Site'}</th>
                   <th>{t('product')}</th>
                   <th>{t('reference')}</th>
                   <th>{t('priceTTC')}</th>
                   <th>{t('clientValidation')}</th>
                   <th>{t('comments')}</th>
                   <th>{t('clientValidationSentOn')}</th>
-                  {role === ROLES.CLIENT && <th>{t('actions')}</th>}
+                  {(role === ROLES.CLIENT || role === ROLES.ALEXIS_ROCHE || role === ROLES.PAUL_ROCHE || (role && !Object.values(ROLES).includes(role))) && <th>{t('actions')}</th>}
                 </tr>
               </thead>
               <tbody>
                 {itemsToValidate.map((item) => (
                   <tr key={item.key}>
                     <td>{item.sectionLabel || '—'}</td>
+                    <td>{item.chantier || '—'}</td>
                     <td>{item.product || '—'}</td>
                     <td>{item.reference || '—'}</td>
                     <td>{formatCurrency(item.priceTTC, language === 'fr' ? 'fr-FR' : 'en-US')}</td>
@@ -235,7 +312,7 @@ function ClientValidation() {
                       </div>
                     </td>
                     <td>{formatSentDate(item.sentAt)}</td>
-                    {role === ROLES.CLIENT && (
+                    {(role === ROLES.CLIENT || role === ROLES.ALEXIS_ROCHE || role === ROLES.PAUL_ROCHE || (role && !Object.values(ROLES).includes(role))) && (
                       <td>
                         <div className="client-validation-actions">
                           <button
@@ -245,6 +322,14 @@ function ClientValidation() {
                             disabled={processingKeys.has(item.key)}
                           >
                             {t('clientApprove')}
+                          </button>
+                          <button
+                            type="button"
+                            className="client-alternative-btn"
+                            onClick={() => handleClientDecision(item, 'alternative')}
+                            disabled={processingKeys.has(item.key)}
+                          >
+                            {t('clientAlternative') || 'Alternative'}
                           </button>
                           <button
                             type="button"

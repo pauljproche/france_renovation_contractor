@@ -17,9 +17,10 @@
             "client": {
               "status": "rejected",
               "note": null,
-              "validatedAt": "2025-11-12T20:11:58.934Z",
+              "validatedAt": "2025-12-02T21:52:11.341Z",
               "replacementUrls": [
-                "hellocat123"
+                "hellocat123",
+                "weeeee"
               ]
             },
             "cray": {
@@ -39,7 +40,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Alexis Roche Paris Apt"
         },
         {
           "product": "Évier Grohe K700",
@@ -51,8 +53,13 @@
           },
           "approvals": {
             "client": {
-              "status": "change_order",
-              "note": "ok avenant"
+              "status": "alternative",
+              "note": "ok avenant",
+              "validatedAt": "2025-12-02T21:54:31.130Z",
+              "replacementUrls": [
+                "sdfsdfsd",
+                "bear_url"
+              ]
             },
             "cray": {
               "status": "approved",
@@ -71,7 +78,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Alexis Roche Paris Apt"
         },
         {
           "product": "Suspension Estiluz Volta (T-3536-W, noir, LED 2700K, 3×565 lm, 86.7×54.3 cm)",
@@ -105,13 +113,14 @@
             "cray": "non validé",
             "client": null
           },
-          "laborType": "Façade, Couverture & ITE"
+          "laborType": "Façade, Couverture & ITE",
+          "chantier": "Alexis Roche Paris Apt"
         },
         {
           "product": "cathat",
           "reference": "5555555",
           "supplierLink": null,
-          "laborType": null,
+          "laborType": "Démolition & Dépose",
           "price": {
             "ttc": null,
             "htQuote": null
@@ -123,7 +132,9 @@
               "validatedAt": "2025-11-17T17:19:27.630Z",
               "replacementUrls": [
                 "hellocat123"
-              ]
+              ],
+              "sentForValidation": true,
+              "sentAt": "2025-12-02T21:54:58.410Z"
             },
             "cray": {
               "status": null,
@@ -142,7 +153,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Paul Roche Belmont House"
         },
         {
           "product": "beegcat",
@@ -182,7 +194,42 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Paul Roche Belmont House"
+        },
+        {
+          "product": "demo_item",
+          "reference": null,
+          "supplierLink": null,
+          "laborType": null,
+          "price": {
+            "ttc": null,
+            "htQuote": null
+          },
+          "approvals": {
+            "client": {
+              "status": "pending",
+              "note": null
+            },
+            "cray": {
+              "status": null,
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": null
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          },
+          "chantier": "Paul Roche Belmont House"
         }
       ]
     },
@@ -220,7 +267,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Alexis Roche Paris Apt"
         },
         {
           "product": "Mitigeur Grohe (lave-mains)",
@@ -255,7 +303,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Alexis Roche Paris Apt"
         },
         {
           "product": "Plaque de déclenchement Geberit Omega 20 (chrome/blanc mat)",
@@ -287,7 +336,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Paul Roche Belmont House"
         },
         {
           "product": "WC suspendu compact Geberit iCon + abattant",
@@ -319,7 +369,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Paul Roche Belmont House"
         },
         {
           "product": "Papier peint Sandberg Pine Grey",
@@ -351,7 +402,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Paul Roche Belmont House"
         }
       ]
     },
@@ -389,7 +441,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Alexis Roche Paris Apt"
         },
         {
           "product": "Hansgrohe corps d'encastrement (ref 13628000)",
@@ -421,7 +474,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Alexis Roche Paris Apt"
         },
         {
           "product": "Mitigeur de lavabo Hansgrohe Tecturis S avec EcoSmart",
@@ -453,7 +507,8 @@
           "comments": {
             "cray": "3 à 5 semaines",
             "client": null
-          }
+          },
+          "chantier": "Alexis Roche Paris Apt"
         },
         {
           "product": "Armoire de toilette Geberit Option (70×15 cm, 2 portes)",
@@ -485,7 +540,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Alexis Roche Paris Apt"
         },
         {
           "product": "Hansgrohe iBox universel avec robinet d'arrêt (ref 01850180)",
@@ -497,8 +553,12 @@
           },
           "approvals": {
             "client": {
-              "status": "approved",
-              "note": null
+              "status": "rejected",
+              "note": null,
+              "validatedAt": "2025-12-02T22:19:32.953Z",
+              "replacementUrls": [
+                "tophat"
+              ]
             },
             "cray": {
               "status": "approved",
@@ -517,7 +577,8 @@
           "comments": {
             "cray": null,
             "client": null
-          }
+          },
+          "chantier": "Paul Roche NY Apt"
         }
       ]
     }

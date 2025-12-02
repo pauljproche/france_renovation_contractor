@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 /**
  * Editable table cell component that wraps content in a <td> element
  */
-export function EditableCell({ value, field, onUpdate, type = 'text', options = null, cellClassName = '' }) {
+export function EditableCell({ value, field, onUpdate, type = 'text', options = null, cellClassName = '', readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
 
@@ -14,6 +14,7 @@ export function EditableCell({ value, field, onUpdate, type = 'text', options = 
   }, [value, isEditing]);
 
   const handleSave = () => {
+    if (readOnly) return;
     if (editValue !== value) {
       onUpdate(field, editValue);
     }
@@ -36,9 +37,9 @@ export function EditableCell({ value, field, onUpdate, type = 'text', options = 
   if (!isEditing) {
     return (
       <td 
-        className={`editable-cell ${cellClassName}`} 
-        onClick={() => setIsEditing(true)}
-        title="Click to edit"
+        className={`editable-cell ${cellClassName} ${readOnly ? 'read-only' : ''}`} 
+        onClick={() => !readOnly && setIsEditing(true)}
+        title={readOnly ? '' : 'Click to edit'}
       >
         {value !== null && value !== undefined ? String(value) : '—'}
       </td>

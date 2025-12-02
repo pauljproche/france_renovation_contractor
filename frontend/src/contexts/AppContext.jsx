@@ -4,14 +4,29 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const LanguageContext = createContext(undefined);
 
 export function LanguageProvider({ children }) {
-  const [language, setLanguage] = useState('en');
+  // Load language from localStorage, default to 'en'
+  const [language, setLanguage] = useState(() => {
+    const saved = localStorage.getItem('language');
+    return saved || 'en';
+  });
 
   const toggleLanguage = () => {
-    setLanguage((prev) => (prev === 'en' ? 'fr' : 'en'));
+    setLanguage((prev) => {
+      const newLanguage = prev === 'en' ? 'fr' : 'en';
+      // Persist to localStorage
+      localStorage.setItem('language', newLanguage);
+      return newLanguage;
+    });
+  };
+
+  // Also persist when language is set directly
+  const setLanguageWithPersistence = (newLanguage) => {
+    setLanguage(newLanguage);
+    localStorage.setItem('language', newLanguage);
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, toggleLanguage }}>
+    <LanguageContext.Provider value={{ language, setLanguage: setLanguageWithPersistence, toggleLanguage }}>
       {children}
     </LanguageContext.Provider>
   );
@@ -31,14 +46,86 @@ const RoleContext = createContext(undefined);
 export const ROLES = {
   CONTRACTOR: 'contractor',
   CLIENT: 'client',
-  ARCHITECT: 'architect'
+  ARCHITECT: 'architect',
+  ALEXIS_ROCHE: 'alexis_roche',
+  PAUL_ROCHE: 'paul_roche'
+};
+
+// Load custom roles from localStorage
+const loadCustomRoles = () => {
+  try {
+    const stored = localStorage.getItem('customRoles');
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.warn('Failed to load custom roles:', e);
+  }
+  return [];
+};
+
+// Save custom roles to localStorage
+const saveCustomRoles = (roles) => {
+  try {
+    localStorage.setItem('customRoles', JSON.stringify(roles));
+  } catch (e) {
+    console.warn('Failed to save custom roles:', e);
+  }
 };
 
 export function RoleProvider({ children }) {
   const [role, setRole] = useState(ROLES.CONTRACTOR);
+  const [customRoles, setCustomRoles] = useState(() => loadCustomRoles());
+
+  // Add a new custom role
+  const addCustomRole = (roleName) => {
+    if (!roleName || !roleName.trim()) {
+      return false;
+    }
+
+    const trimmedName = roleName.trim();
+    const roleId = trimmedName.toLowerCase().replace(/\s+/g, '_');
+
+    // Check if role already exists (by name or ID)
+    const exists = customRoles.some(
+      r => r.id === roleId || r.name.toLowerCase() === trimmedName.toLowerCase()
+    ) || Object.values(ROLES).includes(roleId);
+
+    if (exists) {
+      return false; // Role already exists
+    }
+
+    const newRole = {
+      id: roleId,
+      name: trimmedName
+    };
+
+    const updatedRoles = [...customRoles, newRole];
+    setCustomRoles(updatedRoles);
+    saveCustomRoles(updatedRoles);
+    return true;
+  };
+
+  // Remove a custom role
+  const removeCustomRole = (roleId) => {
+    const updatedRoles = customRoles.filter(r => r.id !== roleId);
+    setCustomRoles(updatedRoles);
+    saveCustomRoles(updatedRoles);
+    
+    // If the removed role was currently selected, switch to contractor
+    if (role === roleId) {
+      setRole(ROLES.CONTRACTOR);
+    }
+  };
 
   return (
-    <RoleContext.Provider value={{ role, setRole }}>
+    <RoleContext.Provider value={{ 
+      role, 
+      setRole, 
+      customRoles, 
+      addCustomRole, 
+      removeCustomRole 
+    }}>
       {children}
     </RoleContext.Provider>
   );

@@ -5,6 +5,7 @@ import { LABOR_TYPES, determineLaborType } from '../utils/laborTypes.js';
 import { useProjects } from '../contexts/ProjectsContext.jsx';
 import { exportFacturePDF, exportDevisPDF } from '../utils/pdfExport.js';
 import { useCustomTable } from '../contexts/CustomTableContext.jsx';
+import { useRole, ROLES } from '../contexts/AppContext.jsx';
 import { logEdit } from '../services/editHistory.js';
 import {
   EditableCellContent,
@@ -20,6 +21,14 @@ export default function EditableMaterialsTable({ search }) {
   const { t } = useTranslation();
   const { selectedProject } = useProjects();
   const { addCustomTable } = useCustomTable();
+  const { role, customRoles } = useRole();
+  
+  // Check if current role is a client role (read-only)
+  const isClientRole = role === ROLES.CLIENT || 
+                       role === ROLES.ALEXIS_ROCHE || 
+                       role === ROLES.PAUL_ROCHE ||
+                       (role && !Object.values(ROLES).includes(role));
+  
   const [editState, setEditState] = useState({});
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState('expanded'); // 'expanded' or 'concise'
@@ -33,10 +42,16 @@ export default function EditableMaterialsTable({ search }) {
   const [selectedItems, setSelectedItems] = useState(() => new Set());
   const [productImages, setProductImages] = useState(() => new Map());
   const [showColumnManager, setShowColumnManager] = useState(false);
+  const [selectedChantier, setSelectedChantier] = useState('');
+  const [draggedColumn, setDraggedColumn] = useState(null);
+  const [dragOverColumn, setDragOverColumn] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartPosRef = useRef({ x: 0, y: 0 });
   
   // Define column order (original order) - moved up for use in state initialization
   const originalColumnOrder = [
     'section',
+    'chantier',
     'product',
     'image',
     'reference',
@@ -306,7 +321,7 @@ export default function EditableMaterialsTable({ search }) {
     return typeof legacy === 'string' && legacy.trim().length > 0 ? [legacy.trim()] : [];
   };
 
-  // Get all items with their section info and apply search filter
+  // Get all items with their section info and apply search filter and role-based filtering
   const allItems = useMemo(() => {
     if (!data?.sections) {
       return [];
@@ -326,13 +341,51 @@ export default function EditableMaterialsTable({ search }) {
       });
     });
     
+    // Apply role-based filtering
+    let filteredItems = items;
+    
+    // If role is Alexis Roche, only show items with "Alexis Roche" in chantier
+    if (role === ROLES.ALEXIS_ROCHE) {
+      filteredItems = items.filter((item) => {
+        const itemChantier = item.chantier || '';
+        return itemChantier.toLowerCase().includes('alexis roche');
+      });
+    }
+    // If role is Paul Roche, only show items with "Paul Roche" in chantier
+    else if (role === ROLES.PAUL_ROCHE) {
+      filteredItems = items.filter((item) => {
+        const itemChantier = item.chantier || '';
+        return itemChantier.toLowerCase().includes('paul roche');
+      });
+    }
+    // For custom roles, check if the role name appears in the chantier
+    else if (role && !Object.values(ROLES).includes(role)) {
+      const customRole = customRoles.find(r => r.id === role);
+      if (customRole) {
+        const roleName = customRole.name;
+        filteredItems = items.filter((item) => {
+          const itemChantier = item.chantier || '';
+          return itemChantier.toLowerCase().includes(roleName.toLowerCase());
+        });
+      }
+    }
+    // CLIENT, CONTRACTOR, ARCHITECT roles see everything (no filtering)
+    
+    // Apply chantier filter
+    if (selectedChantier) {
+      filteredItems = filteredItems.filter((item) => {
+        const itemChantier = item.chantier || '';
+        return itemChantier === selectedChantier;
+      });
+    }
+    
     // Apply search filter
     if (search.trim()) {
       const term = search.trim().toLowerCase();
-      return items.filter((item) => {
+      filteredItems = filteredItems.filter((item) => {
         const laborType = item.laborType || determineLaborType(item.product, item.sectionLabel, item.sectionId);
         const replacementTargets = item.clientReplacementUrls?.join(' ') || '';
-        const target = [item.product, item.reference, item?.approvals?.cray?.status, laborType, replacementTargets]
+        const target = [item.product, item.reference, item.chantier, item?.approvals?.cray?.status, laborType, replacementTargets]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
@@ -340,14 +393,69 @@ export default function EditableMaterialsTable({ search }) {
       });
     }
     
-    return items;
-  }, [data, search]);
+    return filteredItems;
+  }, [data, search, role, customRoles, selectedChantier]);
+
+  // Get unique chantiers from all items (before filtering by selected chantier)
+  const availableChantiers = useMemo(() => {
+    if (!data?.sections) {
+      return [];
+    }
+    const items = [];
+    data.sections.forEach((section) => {
+      section.items.forEach((item) => {
+        items.push(item);
+      });
+    });
+    
+    // Apply role-based filtering to get available chantiers for current role
+    let roleFilteredItems = items;
+    if (role === ROLES.ALEXIS_ROCHE) {
+      roleFilteredItems = items.filter((item) => {
+        const itemChantier = item.chantier || '';
+        return itemChantier.toLowerCase().includes('alexis roche');
+      });
+    } else if (role === ROLES.PAUL_ROCHE) {
+      roleFilteredItems = items.filter((item) => {
+        const itemChantier = item.chantier || '';
+        return itemChantier.toLowerCase().includes('paul roche');
+      });
+    } else if (role && !Object.values(ROLES).includes(role)) {
+      const customRole = customRoles.find(r => r.id === role);
+      if (customRole) {
+        const roleName = customRole.name;
+        roleFilteredItems = items.filter((item) => {
+          const itemChantier = item.chantier || '';
+          return itemChantier.toLowerCase().includes(roleName.toLowerCase());
+        });
+      }
+    }
+    
+    // Extract unique chantiers
+    const chantiers = new Set();
+    roleFilteredItems.forEach((item) => {
+      if (item.chantier && typeof item.chantier === 'string' && item.chantier.trim()) {
+        chantiers.add(item.chantier.trim());
+      }
+    });
+    
+    return Array.from(chantiers).sort();
+  }, [data, role, customRoles]);
+
+  // Reset selected chantier if it's no longer available
+  useEffect(() => {
+    if (selectedChantier && !availableChantiers.includes(selectedChantier)) {
+      setSelectedChantier('');
+    }
+  }, [availableChantiers, selectedChantier]);
 
   // Get value for sorting based on column
   const getSortValue = (item, column) => {
     switch (column) {
       case 'section':
         return item.sectionLabel || '';
+      case 'chantier':
+        return item.chantier || '';
       case 'product':
         return item.product || '';
       case 'reference':
@@ -461,6 +569,7 @@ export default function EditableMaterialsTable({ search }) {
     
     const labels = {
       section: t('section'),
+      chantier: t('chantier') || 'Chantier / Construction Site',
       product: t('product'),
       image: 'Image',
       reference: t('reference'),
@@ -535,6 +644,97 @@ export default function EditableMaterialsTable({ search }) {
     }
     return base;
   }, [customColumns, userColumnOrder, originalColumnOrder]);
+
+  // Handle column drag and drop
+  const handleColumnDragStart = (e, column) => {
+    setDraggedColumn(column);
+    setIsDragging(true);
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', column);
+    // Make the dragged element semi-transparent
+    if (e.target && e.target.style) {
+      e.target.style.opacity = '0.5';
+    }
+  };
+
+  const handleColumnDragOver = (e, column) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedColumn && draggedColumn !== column) {
+      setDragOverColumn(column);
+    }
+  };
+
+  const handleColumnDragLeave = (e) => {
+    // Only clear if we're actually leaving the element (not just moving to a child)
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverColumn(null);
+    }
+  };
+
+  const handleColumnDrop = (e, targetColumn, isCustomTable = false) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draggedColumn || draggedColumn === targetColumn) {
+      setDraggedColumn(null);
+      setDragOverColumn(null);
+      return;
+    }
+
+    if (isCustomTable && customTableActive) {
+      // Handle custom table column reordering
+      const currentOrder = [...customTableColumns];
+      const draggedIndex = currentOrder.indexOf(draggedColumn);
+      const targetIndex = currentOrder.indexOf(targetColumn);
+      
+      if (draggedIndex === -1 || targetIndex === -1) {
+        setDraggedColumn(null);
+        setDragOverColumn(null);
+        return;
+      }
+
+      const newOrder = [...currentOrder];
+      newOrder.splice(draggedIndex, 1);
+      newOrder.splice(targetIndex, 0, draggedColumn);
+      
+      setCustomTableColumns(newOrder);
+    } else {
+      // Handle main table column reordering
+      const currentOrder = userColumnOrder || allAvailableColumns;
+      
+      // Find indices in the full order
+      const draggedIndex = currentOrder.indexOf(draggedColumn);
+      const targetIndex = currentOrder.indexOf(targetColumn);
+      
+      if (draggedIndex === -1 || targetIndex === -1) {
+        setDraggedColumn(null);
+        setDragOverColumn(null);
+        return;
+      }
+
+      // Reorder columns: remove dragged column and insert at target position
+      const newOrder = [...currentOrder];
+      newOrder.splice(draggedIndex, 1);
+      newOrder.splice(targetIndex, 0, draggedColumn);
+      
+      // Update user column order
+      setUserColumnOrder(newOrder);
+    }
+    
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+  };
+
+  const handleColumnDragEnd = (e) => {
+    if (e.target && e.target.style) {
+      e.target.style.opacity = '';
+    }
+    setDraggedColumn(null);
+    setDragOverColumn(null);
+    setIsDragging(false);
+  };
 
   // Reorder columns: move sorted column to front, and filter by visibility
   // Preserve user's column order while moving sorted column to front
@@ -673,6 +873,11 @@ export default function EditableMaterialsTable({ search }) {
   };
 
   const handleSendToClient = async () => {
+    // Only contractors/architects can send to client
+    if (isClientRole) {
+      return;
+    }
+
     if (!data?.sections || selectedItems.size === 0) {
       return;
     }
@@ -749,7 +954,63 @@ export default function EditableMaterialsTable({ search }) {
   }, [sortedAndGroupedItems, customTableActive]);
 
   const selectedCount = selectedItems.size;
-  const tableColSpan = columnOrder.length + 2; // +1 for select column, +1 for actions column
+  const tableColSpan = columnOrder.length + 1 + (isClientRole ? 0 : 1); // +1 for select column, +1 for actions column (if not client)
+
+  // Extract client name from selected items' chantier fields
+  const getClientNameFromSelected = useMemo(() => {
+    if (!data?.sections || selectedItems.size === 0) {
+      return null;
+    }
+
+    const clientNames = new Set();
+    const keys = Array.from(selectedItems);
+    let hasAnyChantier = false;
+    
+    keys.forEach((key) => {
+      const [sectionId, itemIndexStr] = key.split('::');
+      const section = data.sections.find((s) => String(s.id) === sectionId);
+      if (!section) {
+        return;
+      }
+      const itemIndex = Number.parseInt(itemIndexStr, 10);
+      if (Number.isNaN(itemIndex) || !section.items[itemIndex]) {
+        return;
+      }
+      
+      const item = section.items[itemIndex];
+      const chantier = item.chantier;
+      
+      // Check if chantier exists and is not null/empty
+      if (chantier && typeof chantier === 'string' && chantier.trim().length > 0) {
+        hasAnyChantier = true;
+        // Extract client name (e.g., "Alexis Roche Paris Apt" -> "Alexis Roche")
+        // Look for patterns like "FirstName LastName" at the start
+        const match = chantier.match(/^([A-Za-z]+(?:\s+[A-Za-z]+)+)/);
+        if (match) {
+          const fullName = match[1];
+          // Take first two words as client name (e.g., "Alexis Roche")
+          const parts = fullName.trim().split(/\s+/);
+          if (parts.length >= 2) {
+            clientNames.add(`${parts[0]} ${parts[1]}`);
+          } else if (parts.length === 1) {
+            clientNames.add(parts[0]);
+          }
+        }
+      }
+    });
+
+    // If no items have a chantier value, return null to use generic "client"
+    if (!hasAnyChantier) {
+      return null;
+    }
+
+    // If all selected items have the same client, return that client name
+    // Otherwise return null to use generic "client"
+    if (clientNames.size === 1) {
+      return Array.from(clientNames)[0];
+    }
+    return null;
+  }, [data, selectedItems]);
 
   // Export handlers
   const handleExportFacture = (items) => {
@@ -778,6 +1039,11 @@ export default function EditableMaterialsTable({ search }) {
   };
 
   const handleUpdate = (sectionId, itemIndex, field, value) => {
+    // Prevent updates if user is a client role
+    if (isClientRole) {
+      return;
+    }
+
     const newData = { ...data };
     const section = newData.sections.find(s => s.id === sectionId);
     if (!section) return;
@@ -858,6 +1124,11 @@ export default function EditableMaterialsTable({ search }) {
   };
 
   const handleDeleteRow = (sectionId, itemIndex) => {
+    // Prevent deletion if user is a client role
+    if (isClientRole) {
+      return;
+    }
+
     const newData = { ...data };
     const section = newData.sections.find(s => s.id === sectionId);
     if (!section) return;
@@ -867,6 +1138,11 @@ export default function EditableMaterialsTable({ search }) {
   };
 
   const handleAddRow = (sectionId) => {
+    // Prevent adding rows if user is a client role
+    if (isClientRole) {
+      return;
+    }
+
     const newData = { ...data };
     const section = newData.sections.find(s => s.id === sectionId);
     if (!section) return;
@@ -931,6 +1207,36 @@ export default function EditableMaterialsTable({ search }) {
         )}
         <div className="table-controls">
         <div className="table-controls-left">
+          {availableChantiers.length > 0 && (
+            <div className="chantier-filter">
+              <label htmlFor="chantier-filter-select" className="chantier-filter-label">
+                {t('filterByChantier') || 'Filter by Chantier:'}
+              </label>
+              <select
+                id="chantier-filter-select"
+                value={selectedChantier}
+                onChange={(e) => setSelectedChantier(e.target.value)}
+                className="chantier-filter-select"
+              >
+                <option value="">{t('allChantiers') || 'All Chantiers'}</option>
+                {availableChantiers.map((chantier) => (
+                  <option key={chantier} value={chantier}>
+                    {chantier}
+                  </option>
+                ))}
+              </select>
+              {selectedChantier && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedChantier('')}
+                  className="chantier-filter-clear"
+                  title={t('clearFilter') || 'Clear filter'}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
           <button
             onClick={() => setViewMode('concise')}
             className={viewMode === 'concise' ? 'view-toggle active' : 'view-toggle'}
@@ -943,13 +1249,16 @@ export default function EditableMaterialsTable({ search }) {
           >
             Expanded
           </button>
-          {selectedCount > 0 && (
+          {selectedCount > 0 && !isClientRole && (
             <button
               onClick={handleSendToClient}
               className="send-to-client-btn"
             >
-              {t('sendToClient')}
-              {selectedCount > 0 ? ` (${selectedCount})` : ''}
+              {getClientNameFromSelected 
+                ? (t('sendToClientNamed') || 'Send to {client} for validation ({count})')
+                    .replace('{client}', getClientNameFromSelected)
+                    .replace('{count}', selectedCount)
+                : t('sendToClient') + (selectedCount > 0 ? ` (${selectedCount})` : '')}
             </button>
           )}
         </div>
@@ -1226,12 +1535,31 @@ export default function EditableMaterialsTable({ search }) {
               <th className="select-column">{t('select')}</th>
             {columnOrder.map((column) => {
               const isExpandable = ['ordered', 'orderDate', 'deliveryDate', 'deliveryStatus', 'quantity', 'comments'].includes(column);
+              const isDragging = draggedColumn === column;
+              const isDragOver = dragOverColumn === column;
               return (
                 <th 
                   key={column}
-                  className={`sortable-header ${isExpandable ? 'expandable-column' : ''}`}
-                  onClick={() => handleColumnSort(column)}
-                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  className={`sortable-header ${isExpandable ? 'expandable-column' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+                  onMouseDown={(e) => {
+                    // Store initial mouse position to detect if it's a drag or click
+                    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+                  }}
+                  onClick={(e) => {
+                    // Only sort if we didn't drag (mouse didn't move much)
+                    const moved = Math.abs(e.clientX - dragStartPosRef.current.x) > 5 || 
+                                 Math.abs(e.clientY - dragStartPosRef.current.y) > 5;
+                    if (!moved && !isDragging) {
+                      handleColumnSort(column);
+                    }
+                  }}
+                  draggable
+                  onDragStart={(e) => handleColumnDragStart(e, column)}
+                  onDragOver={(e) => handleColumnDragOver(e, column)}
+                  onDragLeave={handleColumnDragLeave}
+                  onDrop={(e) => handleColumnDrop(e, column)}
+                  onDragEnd={handleColumnDragEnd}
+                  style={{ userSelect: 'none' }}
                 >
                   {getColumnLabel(column)}
                   {sortColumn === column && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
@@ -1255,17 +1583,19 @@ export default function EditableMaterialsTable({ search }) {
                   <td colSpan={tableColSpan}>
                     <div className="section-row-content">
                       <span>{getColumnLabel(sortColumn)}: {group.value}</span>
-                      <button 
-                        className="add-row-btn"
-                        onClick={() => {
-                          // Add to first section in group, or use original section
-                          const firstItem = group.items[0];
-                          handleAddRow(firstItem.sectionId);
-                        }}
-                        title="Add row"
-                      >
-                        +
-                      </button>
+                      {!isClientRole && (
+                        <button 
+                          className="add-row-btn"
+                          onClick={() => {
+                            // Add to first section in group, or use original section
+                            const firstItem = group.items[0];
+                            handleAddRow(firstItem.sectionId);
+                          }}
+                          title="Add row"
+                        >
+                          +
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1292,6 +1622,16 @@ export default function EditableMaterialsTable({ search }) {
                     switch (column) {
                       case 'section':
                         return <td key={column}>{item.sectionLabel}</td>;
+                      case 'chantier':
+                        return (
+                          <EditableCell
+                            key={column}
+                            value={item.chantier}
+                            field="chantier"
+                            onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value)}
+                            readOnly={isClientRole}
+                          />
+                        );
                       case 'product':
                         return (
                           <EditableCell
@@ -1299,6 +1639,7 @@ export default function EditableMaterialsTable({ search }) {
                             value={item.product}
                             field="product"
                             onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value)}
+                            readOnly={isClientRole}
                           />
                         );
                       case 'image': {
@@ -1336,6 +1677,7 @@ export default function EditableMaterialsTable({ search }) {
                             value={item.reference}
                             field="reference"
                             onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value)}
+                            readOnly={isClientRole}
                           />
                         );
                       case 'laborType':
@@ -1347,6 +1689,7 @@ export default function EditableMaterialsTable({ search }) {
                             onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value)}
                             type="select"
                             options={LABOR_TYPES}
+                            readOnly={isClientRole}
                           />
                         );
                       case 'priceTTC':
@@ -1360,6 +1703,7 @@ export default function EditableMaterialsTable({ search }) {
                               handleUpdate(item.sectionId, item.itemIndex, field, numValue);
                             }}
                             type="number"
+                            readOnly={isClientRole}
                           />
                         );
                       case 'htQuote':
@@ -1372,6 +1716,7 @@ export default function EditableMaterialsTable({ search }) {
                               const numValue = value === '' || value === null ? null : parseFloat(value);
                               handleUpdate(item.sectionId, item.itemIndex, field, numValue);
                             }}
+                            readOnly={isClientRole}
                           />
                         );
                       case 'clientValidation':
@@ -1408,6 +1753,7 @@ export default function EditableMaterialsTable({ search }) {
                             onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value === 'true' || value === true)}
                             type="select"
                             options={['false', 'true']}
+                            readOnly={isClientRole}
                           />
                         );
                       case 'orderDate':
@@ -1418,6 +1764,7 @@ export default function EditableMaterialsTable({ search }) {
                             field="order.orderDate"
                             cellClassName="expandable-column"
                             onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value)}
+                            readOnly={isClientRole}
                           />
                         );
                       case 'deliveryDate':
@@ -1428,6 +1775,7 @@ export default function EditableMaterialsTable({ search }) {
                             field="order.delivery.date"
                             cellClassName="expandable-column"
                             onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value)}
+                            readOnly={isClientRole}
                           />
                         );
                       case 'deliveryStatus':
@@ -1438,6 +1786,7 @@ export default function EditableMaterialsTable({ search }) {
                             field="order.delivery.status"
                             cellClassName="expandable-column"
                             onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value)}
+                            readOnly={isClientRole}
                           />
                         );
                       case 'quantity':
@@ -1452,6 +1801,7 @@ export default function EditableMaterialsTable({ search }) {
                               handleUpdate(item.sectionId, item.itemIndex, field, intValue);
                             }}
                             type="number"
+                            readOnly={isClientRole}
                           />
                         );
                       case 'comments':
@@ -1568,25 +1918,27 @@ export default function EditableMaterialsTable({ search }) {
                           />
                         </td>
                       {columnOrder.map(column => renderCell(column))}
-                      <td key="actions" className="actions-column" style={{ width: '40px', textAlign: 'center' }}>
-                        <button 
-                          className="delete-row-btn"
-                          onClick={() => handleDeleteRow(item.sectionId, item.itemIndex)}
-                          title={t('deleteRow') || 'Delete row'}
-                          style={{
-                            padding: '4px 8px',
-                            background: '#ef4444',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '16px',
-                            lineHeight: '1'
-                          }}
-                        >
-                          ×
-                        </button>
-                      </td>
+                      {!isClientRole && (
+                        <td key="actions" className="actions-column" style={{ width: '40px', textAlign: 'center' }}>
+                          <button 
+                            className="delete-row-btn"
+                            onClick={() => handleDeleteRow(item.sectionId, item.itemIndex)}
+                            title={t('deleteRow') || 'Delete row'}
+                            style={{
+                              padding: '4px 8px',
+                              background: '#ef4444',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '16px',
+                              lineHeight: '1'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -1634,12 +1986,31 @@ export default function EditableMaterialsTable({ search }) {
                 <tr>
                   {customColumnOrder.map((column) => {
                     const isExpandable = ['ordered', 'orderDate', 'deliveryDate', 'deliveryStatus', 'quantity', 'comments'].includes(column);
+                    const isDragging = draggedColumn === column;
+                    const isDragOver = dragOverColumn === column;
                     return (
                       <th 
                         key={column}
-                        className={`sortable-header ${isExpandable ? 'expandable-column' : ''}`}
-                        onClick={() => handleColumnSort(column)}
-                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                        className={`sortable-header ${isExpandable ? 'expandable-column' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+                        onMouseDown={(e) => {
+                          // Store initial mouse position to detect if it's a drag or click
+                          dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+                        }}
+                        onClick={(e) => {
+                          // Only sort if we didn't drag (mouse didn't move much)
+                          const moved = Math.abs(e.clientX - dragStartPosRef.current.x) > 5 || 
+                                       Math.abs(e.clientY - dragStartPosRef.current.y) > 5;
+                          if (!moved && !isDragging) {
+                            handleColumnSort(column);
+                          }
+                        }}
+                        draggable
+                        onDragStart={(e) => handleColumnDragStart(e, column)}
+                        onDragOver={(e) => handleColumnDragOver(e, column)}
+                        onDragLeave={handleColumnDragLeave}
+                        onDrop={(e) => handleColumnDrop(e, column, true)}
+                        onDragEnd={handleColumnDragEnd}
+                        style={{ userSelect: 'none' }}
                       >
                         {getColumnLabel(column)}
                         {sortColumn === column && (sortDirection === 'asc' ? ' ↑' : ' ↓')}
@@ -1671,6 +2042,15 @@ export default function EditableMaterialsTable({ search }) {
                           switch (column) {
                             case 'section':
                               return <td key={column}>{item.sectionLabel}</td>;
+                            case 'chantier':
+                              return (
+                                <EditableCell
+                                  key={column}
+                                  value={item.chantier}
+                                  field="chantier"
+                                  onUpdate={(field, value) => handleUpdate(item.sectionId, item.itemIndex, field, value)}
+                                />
+                              );
                             case 'product':
                               return (
                                 <EditableCell

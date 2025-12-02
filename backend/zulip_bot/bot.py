@@ -108,29 +108,45 @@ class ContractorBot:
         """
         Check if the query is asking about items needing validation (question) vs requesting validation (action).
         
+        Based on the system prompt:
+        - Questions: "what items need to be validated?", "show me items requiring validation"
+        - Actions: "validate [item] as [role]", "approve [item] as [role]"
+        
         Args:
             query: User's query text
-        
+            
         Returns:
             bool: True if this is a validation question (not an action request)
         """
         query_lower = query.lower()
         
-        # Check if it's an action request (user wants to validate/approve/reject something)
+        # Check if it's an action request (user wants to validate/approve something)
+        # Pattern: "validate [item] as [role]" or "approve [item] as [role]"
         action_patterns = [
-            'validate the', 'validate this', 'validate [', 'approve the', 'approve this',
-            'can you validate', 'please validate', 'validate item', 'validate as',
-            'reject the', 'reject this', 'reject [', 'can you reject', 'please reject',
-            'reject item', 'reject as'
+            'validate the', 'validate this', 'validate [', 
+            'approve the', 'approve this', 'approve [',
+            'can you validate', 'please validate', 
+            'validate as', 'approve as',
+            # Also check for patterns with role specification
+            'validate', 'approve'  # These followed by "as" indicate action
         ]
+        
+        # More specific check: if "validate" or "approve" is followed by "as", it's an action
         if any(pattern in query_lower for pattern in action_patterns):
-            return False  # This is an action, not a question
+            # Check if it's followed by "as [role]" which indicates an action
+            if ' as ' in query_lower or ' as ' in query_lower:
+                return False  # This is an action, not a question
+            # If validate/approve appears but not with "as", check if it's a question pattern
+            if any(q in query_lower for q in ['what', 'which', 'show', 'list', 'needs to', 'requiring']):
+                return True  # This is a question
         
         # Check if it's a question (user wants to know what needs validation)
+        # Based on system prompt: "what items need to be validated?", "show me items requiring validation"
         question_keywords = [
             'what needs', 'what items need', 'show me', 'list', 'which items',
             'items requiring', 'needs to validate', 'pending validation',
-            'what requires', 'what should be validated'
+            'what requires', 'what should be validated',
+            'what needs to be validated', 'what does', 'what have to'
         ]
         return any(keyword in query_lower for keyword in question_keywords)
     
@@ -224,10 +240,17 @@ class ContractorBot:
     def _format_zulip_message(self, text: str) -> str:
         """
         Format message text for Zulip with proper line breaks.
+        Handles the response format from system prompt: EN: and FR: markers.
         Minimal formatting - only fixes obvious issues without breaking markdown.
         
+        Based on system prompt requirements:
+        - Responses should have "EN:" and "FR:" markers
+        - Use plain text or markdown formatting only
+        - No HTML tags
+        - Proper blank lines between sections
+        
         Args:
-            text: Raw message text from LLM
+            text: Raw message text from LLM (may contain EN:/FR: markers)
             
         Returns:
             str: Properly formatted text for Zulip
@@ -237,19 +260,26 @@ class ContractorBot:
         
         import re
         
-        # Remove HTML tags (LLM sometimes generates HTML instead of markdown)
-        text = re.sub(r'<[^>]+>', '', text)  # Remove all HTML tags like <hr>, <br>, etc.
+        # Remove HTML tags (system prompt says: DO NOT use HTML tags like <hr>, <br>, etc.)
+        text = re.sub(r'<[^>]+>', '', text)
         
         # Normalize line breaks
         text = text.replace('\r\n', '\n').replace('\r', '\n')
         
-        # Only fix cases where elements are clearly on the same line
+        # Handle EN:/FR: markers if present (system prompt format)
+        # Remove markers since Zulip will display the full message
+        # But preserve the structure (blank line between languages)
+        text = re.sub(r'^EN:\s*', '', text, flags=re.MULTILINE)
+        text = re.sub(r'^FR:\s*', '', text, flags=re.MULTILINE)
+        
+        # Fix formatting issues per system prompt requirements
         # Pattern 1: Bullet point item ending, followed by section header on same line
+        # System prompt: "Each section header on its own line"
         # e.g., "• item — status **Section:**" -> "• item — status\n**Section:**"
-        # Be careful not to break bold markdown that's already correct
         text = re.sub(r'([•]\s[^•\n]+?—[^•\n]+?)(\*\*[^*]+\*\*)', r'\1\n\2', text)
         
         # Pattern 2: Bullet point followed by "Total:" on same line
+        # System prompt: "One blank line before 'Total:'"
         # e.g., "• item Total: 7" -> "• item\n\nTotal: 7"
         text = re.sub(r'([•]\s[^\n]+?)(Total:?\s)', r'\1\n\n\2', text, flags=re.IGNORECASE)
         
@@ -266,6 +296,7 @@ class ContractorBot:
         text = '\n'.join(cleaned_lines)
         
         # Clean up excessive blank lines (more than 2 consecutive)
+        # System prompt: "One blank line between sections"
         text = re.sub(r'\n{3,}', '\n\n', text)
         
         return text.strip()
@@ -333,13 +364,16 @@ class ContractorBot:
             logger.info("Querying assistant API...")
             
             # Add conversation context to the prompt if available
-            # BUT: For validation questions, don't include context as it might confuse the LLM
+            # Per system prompt: For confirmations, extract from ORIGINAL request in conversation context
+            # BUT: For validation questions, don't include context to ensure systematic checking
             enhanced_prompt = query
             if conversation_context and not is_validation_question:
+                # Include context for actions/confirmations (system prompt: "Look at conversation context")
                 enhanced_prompt = f"Recent conversation:\n{conversation_context}\n\nCurrent request: {query}"
                 logger.info(f"Added conversation context ({len(conversation_context)} chars)")
             elif conversation_context and is_validation_question:
-                logger.info("Skipping conversation context for validation question to ensure complete results")
+                # System prompt: "Go through EVERY section" - context might cause LLM to skip items
+                logger.info("Skipping conversation context for validation question to ensure systematic checking of ALL items")
             
             response = query_assistant(
                 api_base_url=self.config["api_base_url"],
@@ -349,26 +383,40 @@ class ContractorBot:
             )
             
             # Get both English and French responses
+            # The backend now returns responses in format: {"answer": "...", "answer_fr": "..."}
+            # These are parsed from the LLM's response which should have "EN:" and "FR:" markers
             answer_en = response.get("en", "").strip()
             answer_fr = response.get("fr", "").strip()
             
-            # Check if the English response already contains both EN and FR sections
-            # (LLM sometimes generates both in one response)
+            # Check if the response already contains both EN and FR sections in the format
+            # This can happen if the LLM includes both languages in one response
+            # Format should be: "EN: [text]\n\nFR: [text]" per system prompt
+            has_en_marker = answer_en.startswith("EN:") or "\nEN:" in answer_en
+            has_fr_marker = answer_fr.startswith("FR:") or "\nFR:" in answer_fr or "FR:" in answer_en
+            
+            # Check if English response already contains French section (old format or combined response)
             has_french_section = "Articles nécessitant" in answer_en or "Articles nécessitant" in answer_fr
             
-            # If English response already contains French section, use it as-is
-            if has_french_section and answer_en:
+            # If response already contains both languages in one string, use it as-is
+            if has_french_section and answer_en and (has_en_marker or has_fr_marker):
+                # Remove EN:/FR: markers if present since Zulip will display both
+                answer = answer_en.replace("EN:", "").replace("FR:", "").strip()
+            elif has_french_section and answer_en:
+                # Old format with both languages combined
                 answer = answer_en
-            # If both are provided and different, combine them
+            # If both are provided separately and different, combine them
             elif answer_en and answer_fr and answer_en != answer_fr:
-                # Combine with blank line separator
-                answer = f"{answer_en}\n\n{answer_fr}"
+                # Remove markers if present
+                en_clean = answer_en.replace("EN:", "").strip()
+                fr_clean = answer_fr.replace("FR:", "").strip()
+                # Combine with blank line separator (matching system prompt format)
+                answer = f"{en_clean}\n\n{fr_clean}"
             elif answer_en:
-                # Only English available
-                answer = answer_en
+                # Only English available, remove marker if present
+                answer = answer_en.replace("EN:", "").strip()
             elif answer_fr:
-                # Only French available
-                answer = answer_fr
+                # Only French available, remove marker if present
+                answer = answer_fr.replace("FR:", "").strip()
             else:
                 # Neither available
                 answer = "Sorry, I couldn't generate a response."
@@ -379,12 +427,23 @@ class ContractorBot:
                 answer = "Sorry, I received an empty response. Please try rephrasing your question."
             
             # If this was a validation question, log it for monitoring
-            # (The LLM should have formatted it correctly based on the prompt)
+            # (The LLM should have formatted it correctly based on the system prompt)
             if is_validation_question:
                 logger.info("Validation question detected - checking response format")
-                # Check if response follows expected format (has section headers and bullet points)
-                if "**Items requiring client validation:**" not in answer:
-                    logger.warning("Validation question response may not be properly formatted")
+                # Check if response follows expected format from system prompt
+                # Should have section headers like "**Items requiring [CLIENT/CRAY] validation:**"
+                has_validation_format = (
+                    "**Items requiring" in answer or 
+                    "**Articles nécessitant" in answer or
+                    "Items requiring" in answer
+                )
+                if not has_validation_format:
+                    logger.warning("Validation question response may not follow expected format from system prompt")
+                # Check for role-specific validation (client vs cray)
+                if "client" in query.lower() and "cray" in answer.lower() and "client" not in answer.lower():
+                    logger.warning("Possible role mismatch: query mentions client but response may reference cray")
+                elif "cray" in query.lower() and "client" in answer.lower() and "cray" not in answer.lower():
+                    logger.warning("Possible role mismatch: query mentions cray but response may reference client")
             
             # Format message for Zulip (ensure proper line breaks for markdown)
             response_text = self._format_zulip_message(answer)

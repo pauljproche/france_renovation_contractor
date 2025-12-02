@@ -320,6 +320,7 @@ class MaterialsQuery(BaseModel):
     prompt: str
     materials: Optional[dict] = None
     customTables: Optional[list] = None
+    language: Optional[str] = 'en'  # Language preference: 'en' or 'fr'
 
 
 class MaterialsUpdate(BaseModel):
@@ -411,6 +412,10 @@ async def query_assistant(query: MaterialsQuery):
         # Load system prompt from external file
         system_prompt = load_system_prompt()
 
+        # Get language preference (default to 'en')
+        user_language = query.language or 'en'
+        language_instruction = f"\n\n🌐 LANGUAGE INSTRUCTION: The user's interface is set to {user_language.upper()}. Provide your response in BOTH English and French using this EXACT format:\n\nEN: [your English response here]\n\nFR: [your French response here]\n\nAlways include both languages in this format, even if the user's interface is in one language. This ensures the response can be displayed correctly in both languages.\n\n"
+
         # Add explicit instruction for validation questions
         validation_instruction = ""
         prompt_lower = query.prompt.lower()
@@ -439,7 +444,7 @@ async def query_assistant(query: MaterialsQuery):
             else:
                 validation_instruction = "\n\n⚠️ CRITICAL INSTRUCTION: You MUST check EVERY item in EVERY section. Do not stop after finding one item. List ALL items that need validation (status: rejected, change_order, null, or any non-approved status). Count them carefully.\n\n"
         
-        user_content = f"Materials data:\n{materials_text}{custom_tables_info}{validation_instruction}Question: {query.prompt}"
+        user_content = f"Materials data:\n{materials_text}{custom_tables_info}{language_instruction}{validation_instruction}Question: {query.prompt}"
 
         tools = [
             {
@@ -451,11 +456,14 @@ async def query_assistant(query: MaterialsQuery):
                         "BEFORE calling this function, you MUST:\n"
                         "1. Find the item by matching product identifier from user's request to materials data\n"
                         "2. Verify the item's product name matches what user requested (identifier can be partial or exact match)\n"
-                        "3. Read the current value from THAT specific item (for arrays, read the entire current array)\n"
-                        "4. Modify the value appropriately:\n"
+                        "3. **CRITICAL**: Use the EXACT product name from the materials data (from the 'product' field) as the expected_product_hint\n"
+                        "   - If user says 'demo_item', but the data has 'demo_item' (exact match), use 'demo_item'\n"
+                        "   - If user says 'cathat', but the data has 'Cathat Item Model X', use 'Cathat Item Model X' (the exact name from data)\n"
+                        "4. Read the current value from THAT specific item (for arrays, read the entire current array)\n"
+                        "5. Modify the value appropriately:\n"
                         "   - Arrays: preserve all existing items unless removing, then add/remove only the specified item(s)\n"
                         "   - Non-arrays: set to the new value\n"
-                        "5. Verify section_id, item_index, and product name all match the correct item\n"
+                        "6. Verify section_id, item_index, and product name all match the correct item\n"
                         "Parameters: section_id (section identifier), item_index (zero-based), field_path (dot-delimited path like 'approvals.client.status'), new_value (complete modified value)."
                     ),
                     "parameters": {
@@ -787,27 +795,38 @@ async def query_assistant(query: MaterialsQuery):
                             product_hint = None
                             
                             # Extract product hint from user's prompt
-                            # Priority: 1) Quoted strings (most specific), 2) Common identifiers, 3) Pattern matching
+                            # Priority: 1) Quoted strings (most specific), 2) Validation/approval patterns, 3) Other patterns
                             quoted_matches = re.findall(r'["\']([^"\']+)["\']', query.prompt)
                             if quoted_matches:
                                 # Use the first quoted string as product hint
-                                product_hint = quoted_matches[0].lower()
+                                product_hint = quoted_matches[0].lower().strip()
                             else:
-                                # Check for common product identifier patterns
-                                # Look for patterns like "the [product]" or "[product] in [section]"
-                                product_patterns = [
-                                    r'the\s+([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)',
-                                    r'([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+in',
-                                    r'([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+row'
-                                ]
-                                for pattern in product_patterns:
-                                    matches = re.findall(pattern, query.prompt, re.IGNORECASE)
-                                    if matches:
-                                        candidate = matches[-1].lower()
-                                        # Filter out common words that aren't products
-                                        if candidate not in ['all', 'them', 'items', 'update', 'the', 'this', 'that']:
-                                            product_hint = candidate
-                                            break
+                                # Check for validation/approval patterns first (most common for validation actions)
+                                # Pattern: "validate [product] as [role]" or "approve [product] as [role]"
+                                # This captures the product name before "as"
+                                validate_pattern = r'(?:validate|approve)\s+(?:the\s+)?([a-zA-Z0-9\-_\s]+?)(?:\s+as\s+|\s+item|\s+in\s+|$)'
+                                validate_match = re.search(validate_pattern, query.prompt, re.IGNORECASE)
+                                if validate_match:
+                                    candidate = validate_match.group(1).strip().lower()
+                                    # Filter out common words that aren't products
+                                    if candidate and candidate not in ['all', 'them', 'items', 'update', 'the', 'this', 'that', 'client', 'cray', 'a', 'an']:
+                                        product_hint = candidate
+                                
+                                # If validation pattern didn't match, try other patterns
+                                if not product_hint:
+                                    product_patterns = [
+                                        r'the\s+([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)',  # "the [product]"
+                                        r'([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+in',  # "[product] in"
+                                        r'([a-zA-Z0-9\-_]+(?:\s+[a-zA-Z0-9\-_]+)?)\s+row'  # "[product] row"
+                                    ]
+                                    for pattern in product_patterns:
+                                        matches = re.findall(pattern, query.prompt, re.IGNORECASE)
+                                        if matches:
+                                            candidate = matches[-1].lower().strip()
+                                            # Filter out common words that aren't products
+                                            if candidate and candidate not in ['all', 'them', 'items', 'update', 'the', 'this', 'that', 'client', 'cray', 'a', 'an']:
+                                                product_hint = candidate
+                                                break
                             
                             # Check for multiple matching items BEFORE updating
                             materials_data = load_materials_data()
@@ -1116,9 +1135,13 @@ async def query_assistant(query: MaterialsQuery):
         french_answer = answer_text   # Default fallback
         
         # Try to extract EN and FR versions
-        # Look for "EN:" and "FR:" markers
+        # Look for "EN:" and "FR:" markers (case-insensitive, but prefer exact match)
         en_index = answer_text.find("EN:")
+        if en_index == -1:
+            en_index = answer_text.find("en:")
         fr_index = answer_text.find("FR:")
+        if fr_index == -1:
+            fr_index = answer_text.find("fr:")
         
         if en_index != -1 and fr_index != -1:
             # Both markers found
@@ -1131,9 +1154,10 @@ async def query_assistant(query: MaterialsQuery):
                 french_part = answer_text[fr_index + 3:en_index].strip()
                 english_part = answer_text[en_index + 3:].strip()
             
-            # Clean up whitespace
-            english_part = ' '.join(english_part.split())
-            french_part = ' '.join(french_part.split())
+            # Clean up whitespace but preserve structure (don't collapse all newlines)
+            # Remove excessive whitespace but keep single newlines for readability
+            english_part = '\n'.join(line.strip() for line in english_part.split('\n') if line.strip())
+            french_part = '\n'.join(line.strip() for line in french_part.split('\n') if line.strip())
             
             if english_part:
                 english_answer = english_part
@@ -1142,14 +1166,14 @@ async def query_assistant(query: MaterialsQuery):
         elif en_index != -1:
             # Only EN: found
             english_part = answer_text[en_index + 3:].strip()
-            english_part = ' '.join(english_part.split())
+            english_part = '\n'.join(line.strip() for line in english_part.split('\n') if line.strip())
             if english_part:
                 english_answer = english_part
                 french_answer = english_part  # Fallback: use English for both
         elif fr_index != -1:
             # Only FR: found - this is a problem, but handle it
             french_part = answer_text[fr_index + 3:].strip()
-            french_part = ' '.join(french_part.split())
+            french_part = '\n'.join(line.strip() for line in french_part.split('\n') if line.strip())
             if french_part:
                 french_answer = french_part
                 english_answer = french_part  # Fallback: use French for both (shouldn't happen)

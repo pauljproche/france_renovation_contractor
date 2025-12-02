@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 /**
  * Specialized cell component for HT Quote values with bubble styling
  */
-export function HTQuoteCell({ value, field, onUpdate }) {
+export function HTQuoteCell({ value, field, onUpdate, readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
 
@@ -14,6 +14,7 @@ export function HTQuoteCell({ value, field, onUpdate }) {
   }, [value, isEditing]);
 
   const handleSave = () => {
+    if (readOnly) return;
     if (editValue !== value) {
       const numValue = editValue === '' || editValue === null ? null : parseFloat(editValue);
       onUpdate(field, numValue);
@@ -36,10 +37,10 @@ export function HTQuoteCell({ value, field, onUpdate }) {
 
   if (!isEditing) {
     if (value === null || value === undefined) {
-      return <td className="editable-cell" onClick={() => setIsEditing(true)} title="Click to edit">—</td>;
+      return <td className={`editable-cell ${readOnly ? 'read-only' : ''}`} onClick={() => !readOnly && setIsEditing(true)} title={readOnly ? '' : 'Click to edit'}>—</td>;
     }
     return (
-      <td className="editable-cell" onClick={() => setIsEditing(true)} title="Click to edit">
+      <td className={`editable-cell ${readOnly ? 'read-only' : ''}`} onClick={() => !readOnly && setIsEditing(true)} title={readOnly ? '' : 'Click to edit'}>
         <span className="ht-quote-bubble">{value}</span>
       </td>
     );

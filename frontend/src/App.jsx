@@ -13,8 +13,10 @@ import Materials from './pages/Materials.jsx';
 import ChatHistory from './pages/ChatHistory.jsx';
 import Settings from './pages/Settings.jsx';
 import ClientValidation from './pages/ClientValidation.jsx';
+import ClientMaterials from './pages/ClientMaterials.jsx';
 import EditHistory from './pages/EditHistory.jsx';
 import PromptLibrary from './pages/PromptLibrary.jsx';
+import CreateDevis from './pages/CreateDevis.jsx';
 
 function App() {
   return (
@@ -46,6 +48,11 @@ function App() {
                       <ClientValidation />
                     </ProtectedTrackingRoute>
                   } />
+                  <Route path="/client-materials" element={
+                    <ProtectedTrackingRoute>
+                      <ClientMaterials />
+                    </ProtectedTrackingRoute>
+                  } />
                   <Route path="/chat-history" element={
                     <ProtectedTrackingRoute>
                       <ChatHistory />
@@ -59,6 +66,11 @@ function App() {
                   <Route path="/prompt-library" element={
                     <ProtectedTrackingRoute>
                       <PromptLibrary />
+                    </ProtectedTrackingRoute>
+                  } />
+                  <Route path="/create-devis" element={
+                    <ProtectedTrackingRoute>
+                      <CreateDevis />
                     </ProtectedTrackingRoute>
                   } />
                 </Route>

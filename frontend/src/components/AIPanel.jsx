@@ -168,7 +168,8 @@ function AIPanel() {
       const answer = await queryMaterialsAssistant({ 
         prompt: userPrompt, 
         materials,
-        customTables: customTables.length > 0 ? customTables : undefined
+        customTables: customTables.length > 0 ? customTables : undefined,
+        language
       });
       // answer is now an object with { en, fr }
       const assistantMessage = { 

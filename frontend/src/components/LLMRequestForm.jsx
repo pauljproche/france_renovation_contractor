@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { queryMaterialsAssistant } from '../services/assistant.js';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useChatHistory } from '../contexts/ChatHistoryContext.jsx';
+import { useLanguage } from '../contexts/AppContext.jsx';
 
 function LLMRequestForm({ materials }) {
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const { addEntry } = useChatHistory();
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,7 +25,7 @@ function LLMRequestForm({ materials }) {
     setResponse('');
 
     try {
-      const answer = await queryMaterialsAssistant({ prompt: userPrompt, materials });
+      const answer = await queryMaterialsAssistant({ prompt: userPrompt, materials, language });
       setResponse(answer);
       setPrompt(''); // Clear the input after successful submission
       

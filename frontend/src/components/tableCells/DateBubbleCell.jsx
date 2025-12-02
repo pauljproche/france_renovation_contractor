@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 /**
  * Specialized cell component for date values with bubble styling
  */
-export function DateBubbleCell({ value, field, onUpdate, cellClassName = '' }) {
+export function DateBubbleCell({ value, field, onUpdate, cellClassName = '', readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
 
@@ -14,6 +14,7 @@ export function DateBubbleCell({ value, field, onUpdate, cellClassName = '' }) {
   }, [value, isEditing]);
 
   const handleSave = () => {
+    if (readOnly) return;
     if (editValue !== value) {
       onUpdate(field, editValue);
     }
@@ -35,10 +36,10 @@ export function DateBubbleCell({ value, field, onUpdate, cellClassName = '' }) {
 
   if (!isEditing) {
     if (value === null || value === undefined) {
-      return <td className={`editable-cell ${cellClassName}`} onClick={() => setIsEditing(true)} title="Click to edit">—</td>;
+      return <td className={`editable-cell ${cellClassName} ${readOnly ? 'read-only' : ''}`} onClick={() => !readOnly && setIsEditing(true)} title={readOnly ? '' : 'Click to edit'}>—</td>;
     }
     return (
-      <td className={`editable-cell ${cellClassName}`} onClick={() => setIsEditing(true)} title="Click to edit">
+      <td className={`editable-cell ${cellClassName} ${readOnly ? 'read-only' : ''}`} onClick={() => !readOnly && setIsEditing(true)} title={readOnly ? '' : 'Click to edit'}>
         <span className="ht-quote-bubble">{value}</span>
       </td>
     );

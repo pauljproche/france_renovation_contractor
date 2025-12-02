@@ -37,20 +37,40 @@ function Sidebar() {
     );
   }
 
+  // Helper function to check if role is a client role
+  const isClientRole = (r) => {
+    return r === ROLES.CLIENT || 
+           r === ROLES.ALEXIS_ROCHE || 
+           r === ROLES.PAUL_ROCHE ||
+           (r && !Object.values(ROLES).includes(r)); // Custom roles are also client roles
+  };
+
   // Role-based navigation items for tracking pages
   const navItems = [
-    { path: '/dashboard', label: t('navDashboard'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT] },
-    { path: '/materials', label: t('navMaterials'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT] },
-    { path: '/client-validation', label: t('navClientValidation'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT] },
-    { path: '/chat-history', label: t('navChatHistory'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT] },
-    { path: '/edit-history', label: t('navEditHistory'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT] },
-    { path: '/prompt-library', label: t('navPromptLibrary'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT] },
+    { path: '/dashboard', label: t('navDashboard'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT, ROLES.ALEXIS_ROCHE, ROLES.PAUL_ROCHE] },
+    { path: '/materials', label: t('navMaterials'), roles: [ROLES.CONTRACTOR, ROLES.ARCHITECT] },
+    { path: '/client-materials', label: t('navClientMaterials') || 'Client Materials', roles: [ROLES.CLIENT, ROLES.ALEXIS_ROCHE, ROLES.PAUL_ROCHE] },
+    { path: '/client-validation', label: t('navClientValidation'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ALEXIS_ROCHE, ROLES.PAUL_ROCHE] },
+    { path: '/chat-history', label: t('navChatHistory'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT, ROLES.ALEXIS_ROCHE, ROLES.PAUL_ROCHE] },
+    { path: '/edit-history', label: t('navEditHistory'), roles: [ROLES.CONTRACTOR, ROLES.ARCHITECT] },
+    { path: '/prompt-library', label: t('navPromptLibrary'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT, ROLES.ALEXIS_ROCHE, ROLES.PAUL_ROCHE] },
+    { path: '/create-devis', label: t('navCreateDevis'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT, ROLES.ARCHITECT, ROLES.ALEXIS_ROCHE, ROLES.PAUL_ROCHE] },
     // Future: Add role-specific pages
     // { path: '/deliveries', label: t('navDeliveries'), roles: [ROLES.CONTRACTOR, ROLES.CLIENT] },
     // { path: '/approvals', label: t('navApprovals'), roles: [ROLES.CLIENT, ROLES.ARCHITECT] },
   ];
 
-  const visibleItems = navItems.filter(item => item.roles.includes(role));
+  // Filter items based on role, including custom roles
+  const visibleItems = navItems.filter(item => {
+    if (item.roles.includes(role)) {
+      return true;
+    }
+    // Check if role is a custom role and if any role in the list is a client role
+    if (isClientRole(role)) {
+      return item.roles.some(r => isClientRole(r));
+    }
+    return false;
+  });
 
   return (
     <aside className="sidebar">

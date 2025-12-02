@@ -280,11 +280,27 @@ function ChatHistory() {
                         {(() => {
                           // Handle both old format (string) and new format (object with en/fr)
                           if (typeof entry.response === 'object' && entry.response !== null) {
-                            // New format: object with en and fr
-                            if (language === 'en') {
-                              return entry.response.en || entry.response.fr || '';
+                            // New format: object with en and fr - show both languages
+                            const enText = entry.response.en || '';
+                            const frText = entry.response.fr || '';
+                            
+                            if (enText && frText && enText !== frText) {
+                              // Show both languages when both are available and different
+                              return (
+                                <>
+                                  <div style={{ marginBottom: '12px' }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>English:</div>
+                                    <div>{enText}</div>
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Français:</div>
+                                    <div>{frText}</div>
+                                  </div>
+                                </>
+                              );
                             } else {
-                              return entry.response.fr || entry.response.en || '';
+                              // Fallback to showing the available language
+                              return enText || frText || '';
                             }
                           } else {
                             // Old format: just a string (fallback)
@@ -378,11 +394,27 @@ function ChatHistory() {
                     {(() => {
                       // Handle both old format (string) and new format (object with en/fr)
                       if (typeof entry.response === 'object' && entry.response !== null) {
-                        // New format: object with en and fr
-                        if (language === 'en') {
-                          return entry.response.en || entry.response.fr || '';
+                        // New format: object with en and fr - show both languages
+                        const enText = entry.response.en || '';
+                        const frText = entry.response.fr || '';
+                        
+                        if (enText && frText && enText !== frText) {
+                          // Show both languages when both are available and different
+                          return (
+                            <>
+                              <div style={{ marginBottom: '12px' }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>English:</div>
+                                <div>{enText}</div>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '4px' }}>Français:</div>
+                                <div>{frText}</div>
+                              </div>
+                            </>
+                          );
                         } else {
-                          return entry.response.fr || entry.response.en || '';
+                          // Fallback to showing the available language
+                          return enText || frText || '';
                         }
                       } else {
                         // Old format: just a string (fallback)
