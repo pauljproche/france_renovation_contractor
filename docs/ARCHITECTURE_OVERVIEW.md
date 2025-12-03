@@ -5,11 +5,12 @@ This document provides a high-level overview of how the tracking system works, f
 ## Table of Contents
 
 1. [System Overview](#system-overview)
-2. [Frontend Architecture](#frontend-architecture)
-3. [Backend Architecture](#backend-architecture)
-4. [AI Agent Flow (Web Interface)](#ai-agent-flow-web-interface)
-5. [Zulip Bot Flow](#zulip-bot-flow)
-6. [Data Flow](#data-flow)
+2. [Target Architecture & Gap Analysis](#target-architecture--gap-analysis)
+3. [Frontend Architecture](#frontend-architecture)
+4. [Backend Architecture](#backend-architecture)
+5. [AI Agent Flow (Web Interface)](#ai-agent-flow-web-interface)
+6. [Zulip Bot Flow](#zulip-bot-flow)
+7. [Data Flow](#data-flow)
 
 ---
 
@@ -33,6 +34,271 @@ OpenAI API (LLM)
     ↓
 Materials Data (JSON file)
 ```
+
+---
+
+## Target Architecture & Gap Analysis
+
+### Target Architecture Vision
+
+The goal is to build a production-ready application with:
+
+- **React Frontend** - Modern UI framework ✅ **IMPLEMENTED**
+- **FastAPI Python Backend** - REST API server ✅ **IMPLEMENTED**
+- **PostgreSQL Database** - Relational database for persistent storage ⚠️ **PLANNED** (migration plan exists)
+- **AWS Cloud Infrastructure** - Cloud deployment and services ❌ **NOT IMPLEMENTED**
+- **Google OAuth** - Authentication and authorization ❌ **NOT IMPLEMENTED**
+
+### Current vs. Target Architecture
+
+```
+CURRENT ARCHITECTURE:
+┌─────────────────┐
+│  React Frontend │ ✅
+└────────┬────────┘
+         │ HTTP
+┌────────▼────────┐
+│ FastAPI Backend │ ✅
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │         │
+┌───▼───┐  ┌──▼──────┐
+│ JSON  │  │ OpenAI  │
+│ Files │  │   API   │ ✅
+└───────┘  └─────────┘
+         │
+    ❌ Simple username/password
+    ❌ No database
+    ❌ No cloud infrastructure
+
+TARGET ARCHITECTURE:
+┌─────────────────┐
+│  React Frontend │ ✅
+│   (AWS S3/CDN)  │ ❌
+└────────┬────────┘
+         │ HTTPS
+┌────────▼────────┐
+│  API Gateway    │ ❌
+│   (AWS/ALB)     │
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│ FastAPI Backend │ ✅
+│  (AWS EC2/ECS)  │ ❌
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    │         │
+┌───▼────┐  ┌──▼──────┐
+│PostgreSQL│ │ OpenAI  │
+│(AWS RDS)│ │   API   │ ✅
+└─────────┘  └─────────┘
+    ⚠️        │
+         │
+    ┌────▼────┐
+    │Google   │
+    │OAuth 2.0│ ❌
+    └─────────┘
+```
+
+### Missing Components & Implementation Status
+
+#### 1. ✅ React Frontend
+**Status**: **IMPLEMENTED**
+- Modern React application with Vite
+- Routing with React Router
+- State management with Context API
+- Multi-language support (EN/FR)
+- Responsive UI components
+
+#### 2. ✅ FastAPI Backend
+**Status**: **IMPLEMENTED**
+- RESTful API endpoints
+- OpenAI LLM integration
+- CORS configuration
+- Error handling and logging
+- File-based data storage (temporary)
+
+#### 3. ⚠️ PostgreSQL Database
+**Status**: **PLANNED BUT NOT IMPLEMENTED**
+- **Current State**: Using JSON files (`data/materials.json`, `data/edit-history.json`)
+- **Migration Plan**: Detailed plan exists in `MIGRATION_PLAN.md` and `MIGRATION_CHECKLIST.md`
+- **What's Needed**:
+  - Database schema design
+  - SQLAlchemy models
+  - Migration scripts (JSON → PostgreSQL)
+  - Database connection pooling
+  - Feature flag for gradual rollout (`USE_DATABASE`)
+  
+**Priority**: **HIGH** - Critical for production readiness, multi-user support, and ACID guarantees
+
+#### 4. ❌ Google OAuth Authentication
+**Status**: **NOT IMPLEMENTED**
+- **Current State**: Simple username/password stored in `sessionStorage` (see `frontend/src/pages/Login.jsx`)
+- **Security Concerns**: 
+  - No real authentication validation
+  - No token management
+  - No user database
+  - Session stored client-side only
+  
+**What's Needed**:
+- Google OAuth 2.0 integration
+  - Frontend: Google Sign-In button, token handling
+  - Backend: OAuth token verification, user session management
+  - User database/model (linked to Google account)
+- JWT token management
+- Protected API endpoints (token validation middleware)
+- User roles/permissions stored in database
+  
+**Priority**: **HIGH** - Security-critical, required for production
+
+#### 5. ❌ AWS Cloud Infrastructure
+**Status**: **NOT IMPLEMENTED**
+- **Current State**: Running locally (localhost:5173, localhost:8000)
+
+**What's Needed**:
+1. **Frontend Hosting**:
+   - AWS S3 for static files
+   - CloudFront CDN for global distribution
+   - Route 53 for DNS
+   
+2. **Backend Hosting**:
+   - AWS EC2 (Virtual Server) OR
+   - AWS ECS/Fargate (Containerized) OR
+   - AWS Lambda (Serverless) + API Gateway
+   
+3. **Database**:
+   - AWS RDS (PostgreSQL managed service)
+   - Automated backups
+   - Multi-AZ for high availability
+   
+4. **Additional Services**:
+   - **AWS Secrets Manager** or **AWS Systems Manager Parameter Store** - For API keys, DB credentials
+   - **AWS CloudWatch** - Logging and monitoring
+   - **AWS Application Load Balancer (ALB)** - Load balancing, SSL termination
+   - **AWS Certificate Manager (ACM)** - SSL/TLS certificates
+   - **AWS VPC** - Network isolation and security
+   - **AWS IAM** - Access control and permissions
+
+**Priority**: **MEDIUM-HIGH** - Required for production deployment
+
+### Additional Components to Consider
+
+#### 6. Caching Layer (Redis)
+**Status**: **NOT IMPLEMENTED**
+- **Purpose**: Cache frequently accessed data, session storage
+- **AWS Option**: AWS ElastiCache (Redis)
+- **Priority**: **MEDIUM** - Performance optimization
+
+#### 7. Message Queue (Optional)
+**Status**: **NOT IMPLEMENTED**
+- **Purpose**: Async task processing, background jobs
+- **AWS Option**: AWS SQS or SNS
+- **Priority**: **LOW** - Only needed for scale
+
+#### 8. CI/CD Pipeline
+**Status**: **NOT IMPLEMENTED**
+- **Purpose**: Automated testing and deployment
+- **Options**: 
+  - GitHub Actions
+  - AWS CodePipeline + CodeBuild
+  - GitLab CI/CD
+- **Priority**: **MEDIUM** - Important for development workflow
+
+#### 9. Monitoring & Observability
+**Status**: **PARTIAL** (Basic logging exists)
+- **Current**: File-based logging (`logs/` directory)
+- **What's Needed**:
+  - Application Performance Monitoring (APM)
+  - Error tracking (Sentry, Rollbar)
+  - AWS CloudWatch dashboards
+  - Health check endpoints
+- **Priority**: **MEDIUM** - Critical for production troubleshooting
+
+#### 10. Backup & Disaster Recovery
+**Status**: **NOT IMPLEMENTED**
+- **What's Needed**:
+  - Automated database backups (AWS RDS automated backups)
+  - Backup retention policies
+  - Disaster recovery plan
+  - Point-in-time recovery capability
+- **Priority**: **HIGH** - Critical for data protection
+
+#### 11. Environment Configuration
+**Status**: **PARTIAL** (`.env` files exist)
+- **What's Needed**:
+  - Environment-specific configs (dev, staging, prod)
+  - Secrets management (AWS Secrets Manager)
+  - Config validation
+- **Priority**: **MEDIUM** - Important for deployment
+
+### Implementation Roadmap Recommendations
+
+#### Phase 1: Core Infrastructure (Critical)
+1. **PostgreSQL Migration** ⚠️
+   - Follow `MIGRATION_PLAN.md`
+   - Estimated: 2-3 weeks
+   - Blocks: Multi-user support, production readiness
+
+2. **Google OAuth Integration** ❌
+   - Frontend: OAuth flow implementation
+   - Backend: Token verification, user management
+   - Estimated: 1-2 weeks
+   - Blocks: Security, user authentication
+
+#### Phase 2: Cloud Deployment (High Priority)
+3. **AWS Infrastructure Setup** ❌
+   - RDS PostgreSQL instance
+   - EC2/ECS for backend
+   - S3 + CloudFront for frontend
+   - Load balancer + SSL
+   - Estimated: 2-3 weeks
+
+4. **Monitoring & Logging** ⚠️
+   - CloudWatch integration
+   - Error tracking setup
+   - Health checks
+   - Estimated: 1 week
+
+#### Phase 3: Optimization (Medium Priority)
+5. **Caching Layer** (Redis) ❌
+   - Session management
+   - Data caching
+   - Estimated: 1 week
+
+6. **CI/CD Pipeline** ❌
+   - Automated tests
+   - Deployment automation
+   - Estimated: 1-2 weeks
+
+### Quick Reference: Component Status
+
+| Component | Status | Priority | Estimated Effort |
+|-----------|--------|----------|------------------|
+| React Frontend | ✅ Implemented | - | - |
+| FastAPI Backend | ✅ Implemented | - | - |
+| PostgreSQL Database | ⚠️ Planned | **HIGH** | 2-3 weeks |
+| Google OAuth | ❌ Missing | **HIGH** | 1-2 weeks |
+| AWS Infrastructure | ❌ Missing | **HIGH** | 2-3 weeks |
+| Monitoring/Logging | ⚠️ Partial | **MEDIUM** | 1 week |
+| Caching (Redis) | ❌ Missing | **MEDIUM** | 1 week |
+| CI/CD Pipeline | ❌ Missing | **MEDIUM** | 1-2 weeks |
+| Backup/Recovery | ❌ Missing | **HIGH** | 1 week |
+
+### Summary
+
+**Currently missing 3 critical components:**
+1. **PostgreSQL Database** - Currently using JSON files (migration plan exists)
+2. **Google OAuth** - Currently using simple username/password (security risk)
+3. **AWS Cloud Infrastructure** - Currently running locally only
+
+**Recommended next steps:**
+1. Execute PostgreSQL migration (follow `MIGRATION_PLAN.md`)
+2. Implement Google OAuth authentication
+3. Set up AWS infrastructure for deployment
+
+The architecture overview below describes the **current implementation** (using JSON files and simple auth). Once the missing components are added, the data flow will shift from file-based to database-backed with proper authentication.
 
 ---
 

@@ -551,5 +551,93 @@
     "old_value": "approved",
     "new_value": "pending",
     "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-02T23:40:31.363293Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "approvals.client.status",
+    "old_value": "pending",
+    "new_value": "approved",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-12-02T23:42:38.363940Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "rejected",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-02T23:43:00.273521Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 0,
+    "product": "Mitigeur Grohe Blue",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-02T23:43:10.077357Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "alternative",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-02T23:43:19.374952Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "rejected",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-02T23:54:11.107296Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 3,
+    "product": "cathat",
+    "field_path": "approvals.client.status",
+    "old_value": "alternative",
+    "new_value": "approved",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-12-03T00:04:51.924769Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-12-03T00:06:37.918870Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "rejected",
+    "source": "manual"
   }
 ]
