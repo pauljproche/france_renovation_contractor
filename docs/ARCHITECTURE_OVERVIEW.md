@@ -247,6 +247,251 @@ The system supports bilingual responses:
 - Language toggle: `frontend/src/components/TopBar.jsx` → `LanguageToggle`
 - AI Panel display: `frontend/src/components/AIPanel.jsx` → line 443 (shows based on `language`)
 
+### Detailed AIPanel Component Flow
+
+The AIPanel component manages the entire conversation lifecycle. Here's how it works:
+
+#### Component Initialization
+
+**File**: `frontend/src/components/AIPanel.jsx`
+
+**State Setup** (lines 32-48):
+```javascript
+const [prompt, setPrompt] = useState('');           // User's input text
+const [loading, setLoading] = useState(false);      // Loading indicator
+const [chatMessages, setChatMessages] = useState([]); // Conversation messages
+const [currentSessionId, setCurrentSessionIdState] = useState(null); // Session tracking
+```
+
+**Data Hooks**:
+- `useMaterialsData()` - Gets current materials data to send to backend
+- `useLanguage()` - Gets user's language preference
+- `useChatHistory()` - Saves conversations to chat history
+- `useCustomTable()` - Gets custom table configurations
+
+#### Session Management
+
+**File**: `frontend/src/utils/aiPanelStorage.js`
+
+The AIPanel uses sessions to group related conversations:
+
+1. **Session Creation** (line 152-157 in AIPanel.jsx):
+   - When user sends first message, creates new session
+   - Uses `createNewSession()` from `aiPanelStorage.js` (line 67)
+   - Generates unique UUID for session ID
+   - Stores in localStorage with username prefix
+
+2. **Session Persistence** (lines 50-56 in AIPanel.jsx):
+   - Automatically saves messages whenever `chatMessages` changes
+   - Uses `saveCurrentSession()` from `aiPanelStorage.js` (line 78)
+   - Saves to localStorage: `ai-panel-sessions-{username}`
+
+3. **Session Loading**:
+   - User can switch between sessions via dropdown
+   - `loadSession()` loads messages from localStorage (line 95 in aiPanelStorage.js)
+   - Messages restored to `chatMessages` state
+
+#### Message Submission Flow
+
+**Function**: `handleSubmit()` (line 145 in AIPanel.jsx)
+
+Here's the detailed step-by-step:
+
+```
+1. User types question and clicks Submit
+   ↓
+2. handleSubmit() called
+   ↓
+3. Create session if first message:
+   - createNewSession() → generates UUID
+   - Sets currentSessionId state
+   ↓
+4. Add user message to UI immediately:
+   - setChatMessages([...prev, { type: 'user', content: prompt }])
+   - This shows user's question right away (optimistic UI)
+   ↓
+5. Clear input and show loading:
+   - setPrompt('')
+   - setLoading(true)
+   ↓
+6. Call queryMaterialsAssistant():
+   - File: frontend/src/services/assistant.js
+   - Sends: { prompt, materials, customTables, language }
+   - Returns: { en: "...", fr: "..." }
+   ↓
+7. On success:
+   - Add assistant message: { type: 'assistant', content: { en, fr } }
+   - Check if response indicates data update (line 183-187)
+   - If update detected: dispatch MATERIALS_RELOAD_EVENT
+   - Save to chat history (both languages)
+   ↓
+8. On error:
+   - Add error message: { type: 'error', content: errorMessage }
+   - Save error to chat history
+   ↓
+9. Hide loading:
+   - setLoading(false)
+```
+
+#### Message Display
+
+**Rendering Logic** (lines 426-463 in AIPanel.jsx):
+
+Messages are rendered in a loop:
+```javascript
+chatMessages.map((message, index) => {
+  // User messages: Show with "You" label
+  // Assistant messages: Show with "Response" label
+  // Error messages: Show with warning styling
+})
+```
+
+**Language Display** (lines 440-453):
+- Checks if `message.content` is object (has `en` and `fr`)
+- If object: Shows only the language matching `language` state
+- If string (legacy): Shows as-is
+
+**Auto-scrolling** (lines 286-290):
+- `useEffect` watches `chatMessages` and `loading`
+- Automatically scrolls to bottom when new messages arrive
+- Uses `contentRef` to access scroll container
+
+#### Data Update Detection
+
+**Code** (lines 183-187 in AIPanel.jsx):
+```javascript
+const updatePattern = /(successfully updated|has been updated|mis à jour|a été mis à jour)/i;
+if (updatePattern.test(englishText) || updatePattern.test(frenchText)) {
+  window.dispatchEvent(new CustomEvent(MATERIALS_RELOAD_EVENT));
+}
+```
+
+When AI agent updates data:
+1. Response contains "successfully updated" (EN or FR)
+2. Pattern match triggers `MATERIALS_RELOAD_EVENT`
+3. Materials table listens for this event
+4. Table automatically refreshes to show new data
+
+#### Session Lifecycle Management
+
+**Auto-save on Changes** (lines 50-56):
+- `useEffect` watches `chatMessages` and `currentSessionId`
+- Automatically saves session whenever messages change
+- Ensures no data loss
+
+**Clear on Navigation** (lines 73-87):
+- When user navigates away from tracking pages
+- Saves current session first
+- Clears session and messages
+- Prevents stale data
+
+**Save on Panel Close** (lines 89-96):
+- When AI panel is closed
+- Saves current session
+- Preserves conversation for later
+
+**Save on Unmount** (lines 98-106):
+- When component unmounts (e.g., logout)
+- Saves session in cleanup function
+- Ensures data persistence
+
+#### Chat History Integration
+
+**Saving to History** (lines 190-195 in AIPanel.jsx):
+```javascript
+addEntry({
+  prompt: userPrompt,
+  response: answer,  // { en: "...", fr: "..." }
+  sessionId: currentSessionId
+});
+```
+
+- Each conversation saved to `ChatHistoryContext`
+- Stored in localStorage separately from sessions
+- Chat History page displays all conversations
+- Shows both languages for reference
+
+#### Key Utility Functions
+
+**File**: `frontend/src/utils/aiPanelStorage.js`
+
+- `createNewSession()` - Creates new session with UUID
+- `saveCurrentSession(messages)` - Saves messages to localStorage
+- `loadSession(sessionId)` - Loads messages for a session
+- `loadAIPanelSessions()` - Gets all saved sessions
+- `deleteSession(sessionId)` - Removes a session
+
+**Storage Keys**:
+- Sessions: `ai-panel-sessions-{username}` (localStorage)
+- Current session ID: `ai-panel-current-session-{username}` (sessionStorage)
+
+#### Visual Flow Diagram
+
+```
+User Input (textarea)
+    ↓
+handleSubmit() triggered
+    ↓
+┌─────────────────────────────────────┐
+│ 1. Create/Get Session               │
+│    - createNewSession() if first    │
+│    - Get currentSessionId            │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│ 2. Update UI State                  │
+│    - Add user message to chatMessages│
+│    - Clear input                    │
+│    - Show loading indicator         │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│ 3. API Call                        │
+│    - queryMaterialsAssistant()      │
+│    - Sends: prompt, materials, lang │
+│    - Waits for response             │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│ 4. Process Response                │
+│    - Add assistant message          │
+│    - Check for data updates         │
+│    - Save to chat history           │
+│    - Hide loading                   │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│ 5. Auto-save Session                │
+│    - saveCurrentSession()           │
+│    - Persists to localStorage       │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│ 6. Auto-scroll                      │
+│    - Scroll to bottom                │
+│    - Show new message                │
+└─────────────────────────────────────┘
+```
+
+#### Error Handling
+
+**Error States** (lines 196-209 in AIPanel.jsx):
+- Network errors caught in try/catch
+- Error message added to `chatMessages` with `type: 'error'`
+- Error also saved to chat history
+- User sees error in UI with warning styling
+
+#### Session Dropdown
+
+**Session Management UI** (lines 297-402 in AIPanel.jsx):
+- Dropdown shows all saved sessions
+- Each session shows: date, message count
+- User can:
+  - Switch to different session
+  - Delete a session
+  - Create new session
+- Sessions sorted by most recent first
+
 ---
 
 ## Zulip Bot Flow
