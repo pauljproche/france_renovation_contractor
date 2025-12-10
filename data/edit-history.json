@@ -639,5 +639,126 @@
     "old_value": "approved",
     "new_value": "rejected",
     "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-03T18:14:52.341255Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-12-03T18:39:10.481107Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "pending",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-03T18:40:22.194043Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 0,
+    "product": "Mitigeur Grohe Blue",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "rejected",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-03T18:40:30.125929Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "approvals.client.status",
+    "old_value": "pending",
+    "new_value": "approved",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-03T18:51:57.414646Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "pending",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-03T18:51:57.423622Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 4,
+    "product": "beegcat",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "pending",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-03T18:52:27.775489Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "product",
+    "old_value": "",
+    "new_value": "sink",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-03T18:52:32.707568Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "product",
+    "old_value": "",
+    "new_value": "sink",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-03T18:52:37.591310Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": null,
+    "new_value": "pending",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-03T18:53:57.963792Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": "pending",
+    "new_value": "rejected",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-03T18:57:55.007286Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 7,
+    "product": "(empty product)",
+    "field_path": "approvals.cray.status",
+    "old_value": null,
+    "new_value": "rejected",
+    "source": "agent"
   }
 ]

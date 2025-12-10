@@ -15,12 +15,13 @@
           },
           "approvals": {
             "client": {
-              "status": "approved",
+              "status": "rejected",
               "note": null,
-              "validatedAt": "2025-12-02T23:43:00.259Z",
+              "validatedAt": "2025-12-03T18:40:22.171Z",
               "replacementUrls": [
                 "hellocat123",
-                "weeeee"
+                "weeeee",
+                "replacement_url_mitigeur_grohe_blue"
               ]
             },
             "cray": {
@@ -166,7 +167,7 @@
           },
           "approvals": {
             "client": {
-              "status": "approved",
+              "status": "pending",
               "note": null,
               "validatedAt": "2025-11-19T19:26:10.944Z",
               "replacementUrls": [
@@ -207,9 +208,9 @@
           },
           "approvals": {
             "client": {
-              "status": "rejected",
+              "status": "pending",
               "note": null,
-              "validatedAt": "2025-12-02T23:43:19.357Z",
+              "validatedAt": "2025-12-03T18:40:30.103Z",
               "replacementUrls": [
                 "demo_item_new_url"
               ]
@@ -233,6 +234,77 @@
             "client": null
           },
           "chantier": "Paul Roche Belmont House"
+        },
+        {
+          "product": "sink",
+          "reference": null,
+          "supplierLink": null,
+          "laborType": null,
+          "price": {
+            "ttc": null,
+            "htQuote": null
+          },
+          "approvals": {
+            "client": {
+              "status": "rejected",
+              "note": null,
+              "validatedAt": "2025-12-03T18:53:57.907Z",
+              "replacementUrls": [
+                "sink_url_alternative"
+              ]
+            },
+            "cray": {
+              "status": null,
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": null
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          },
+          "chantier": "alexis roche"
+        },
+        {
+          "product": "",
+          "reference": null,
+          "supplierLink": null,
+          "laborType": null,
+          "price": {
+            "ttc": null,
+            "htQuote": null
+          },
+          "approvals": {
+            "client": {
+              "status": null,
+              "note": null
+            },
+            "cray": {
+              "status": "rejected",
+              "note": null
+            }
+          },
+          "order": {
+            "ordered": false,
+            "orderDate": null,
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": null
+          },
+          "comments": {
+            "cray": null,
+            "client": null
+          }
         }
       ]
     },
