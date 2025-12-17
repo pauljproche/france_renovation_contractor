@@ -11,6 +11,7 @@ export const translations = {
     navTrackingDashboard: 'Tracking Dashboard',
     navProjects: 'Projects',
     navTimeline: 'Chantiers Timeline',
+    navWorkers: 'Workers',
     navSettings: 'Settings',
     profile: 'Profile',
     logout: 'Log Out',
@@ -95,6 +96,10 @@ export const translations = {
     timelineTitle: 'Chantiers Timeline',
     timelineSubtitle: 'View all projects on a calendar timeline',
     today: 'Today',
+    
+    // Workers Page
+    workersTitle: 'Workers',
+    workersSubtitle: 'Visual overview of all workers and their scheduled jobs',
     noProjectsTimeline: 'No projects available for timeline view',
     projectName: 'Project Name',
     zoomDay: 'Day',
@@ -178,6 +183,31 @@ export const translations = {
     allDeliveriesReceived: 'All in-progress deliveries have been received.',
     noDeliveryData: 'No delivery data available.',
     comingSoon: 'coming soon',
+    
+    // Workers Card
+    projectWorkers: 'Project Workers',
+    noWorkersAssigned: 'No workers currently assigned to this project',
+    activeJob: 'active job',
+    activeJobs: 'active jobs',
+    jobTypePlumbing: 'Plumbing',
+    jobTypeElectrical: 'Electrical',
+    jobTypeDemo: 'Demolition',
+    jobTypeGeneral: 'General',
+    
+    // Workers Page - Add/Edit
+    addWorker: 'Add Worker',
+    editWorker: 'Edit Worker',
+    workerName: 'Name',
+    workerEmail: 'Email',
+    workerPhone: 'Phone',
+    workerNamePlaceholder: 'Worker name',
+    workerEmailPlaceholder: 'email@example.com',
+    workerPhonePlaceholder: '+33 6 12 34 56 78',
+    workerNameRequired: 'Worker name is required',
+    saveChanges: 'Save Changes',
+    deleteWorker: 'Delete Worker',
+    deleteWorkerConfirm: 'Are you sure you want to delete {name}? This action cannot be undone.',
+    deleteWorkerConfirmWithJobs: 'Are you sure you want to delete {name}? This will also delete {count} associated job(s). This action cannot be undone.',
     
     // Materials
     materialsTitle: 'Materials & Procurement',
@@ -359,6 +389,7 @@ export const translations = {
     navTrackingDashboard: 'Tableau de bord - Suivi',
     navProjects: 'Projets',
     navTimeline: 'Planning Chantiers',
+    navWorkers: 'Ouvriers',
     navSettings: 'Paramètres',
     profile: 'Profil',
     logout: 'Déconnexion',
@@ -443,6 +474,10 @@ export const translations = {
     timelineTitle: 'Planning Chantiers',
     timelineSubtitle: 'Voir tous les projets sur un calendrier',
     today: "Aujourd'hui",
+    
+    // Workers Page
+    workersTitle: 'Ouvriers',
+    workersSubtitle: 'Vue d\'ensemble de tous les ouvriers et leurs tâches planifiées',
     noProjectsTimeline: 'Aucun projet disponible pour la vue timeline',
     projectName: 'Nom du Projet',
     zoomDay: 'Jour',
@@ -526,6 +561,31 @@ export const translations = {
     allDeliveriesReceived: 'Toutes les livraisons en cours ont été reçues.',
     noDeliveryData: 'Aucune donnée de livraison disponible.',
     comingSoon: 'à venir',
+    
+    // Workers Card
+    projectWorkers: 'Ouvriers du Projet',
+    noWorkersAssigned: 'Aucun ouvrier assigné à ce projet pour le moment',
+    activeJob: 'tâche active',
+    activeJobs: 'tâches actives',
+    jobTypePlumbing: 'Plomberie',
+    jobTypeElectrical: 'Électricité',
+    jobTypeDemo: 'Démolition',
+    jobTypeGeneral: 'Général',
+    
+    // Workers Page - Add/Edit
+    addWorker: 'Ajouter un Ouvrier',
+    editWorker: 'Modifier l\'Ouvrier',
+    workerName: 'Nom',
+    workerEmail: 'Email',
+    workerPhone: 'Téléphone',
+    workerNamePlaceholder: 'Nom de l\'ouvrier',
+    workerEmailPlaceholder: 'email@exemple.com',
+    workerPhonePlaceholder: '+33 6 12 34 56 78',
+    workerNameRequired: 'Le nom de l\'ouvrier est requis',
+    saveChanges: 'Enregistrer les Modifications',
+    deleteWorker: 'Supprimer l\'Ouvrier',
+    deleteWorkerConfirm: 'Êtes-vous sûr de vouloir supprimer {name} ? Cette action est irréversible.',
+    deleteWorkerConfirmWithJobs: 'Êtes-vous sûr de vouloir supprimer {name} ? Cela supprimera également {count} tâche(s) associée(s). Cette action est irréversible.',
     
     // Materials
     materialsTitle: 'Matériaux et Approvisionnement',

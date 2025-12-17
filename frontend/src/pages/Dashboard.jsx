@@ -1,6 +1,7 @@
 import { useMaterialsData, formatCurrency } from '../hooks/useMaterialsData.js';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useRole } from '../contexts/AppContext.jsx';
+import WorkersCard from '../components/WorkersCard.jsx';
 
 function Dashboard() {
   const { data, loading, error, metrics } = useMaterialsData();
@@ -71,6 +72,8 @@ function Dashboard() {
             <p>{t('noDeliveryData')}</p>
           )}
         </div>
+        
+        <WorkersCard />
       </section>
     </>
   );

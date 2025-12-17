@@ -15,9 +15,10 @@ function Sidebar() {
   const isGlobalDashboard = location.pathname === '/global-dashboard';
   const isSettings = location.pathname === '/settings';
   const isTimeline = location.pathname === '/timeline';
+  const isWorkers = location.pathname === '/workers';
 
-  // If on global dashboard, settings, or timeline page, show "Projects", "Timeline", and "Settings" links
-  if (isGlobalDashboard || isSettings || isTimeline) {
+  // If on global dashboard, settings, timeline, or workers page, show navigation links
+  if (isGlobalDashboard || isSettings || isTimeline || isWorkers) {
     return (
       <aside className="sidebar">
         <nav className="nav-links">
@@ -32,6 +33,12 @@ function Sidebar() {
             className={navLinkClass}
           >
             {t('navTimeline')}
+          </NavLink>
+          <NavLink
+            to="/workers"
+            className={navLinkClass}
+          >
+            {t('navWorkers') || 'Workers'}
           </NavLink>
           <NavLink
             to="/settings"
@@ -101,7 +108,8 @@ function Layout() {
   const isGlobalDashboard = location.pathname === '/global-dashboard';
   const isSettings = location.pathname === '/settings';
   const isTimeline = location.pathname === '/timeline';
-  const showAIPanel = !isGlobalDashboard && !isSettings && !isTimeline;
+  const isWorkers = location.pathname === '/workers';
+  const showAIPanel = !isGlobalDashboard && !isSettings && !isTimeline && !isWorkers;
   const { theme } = useTheme();
 
   return (
@@ -109,7 +117,7 @@ function Layout() {
       <TopBar />
       <div className={`app-body ${showAIPanel ? 'has-ai-panel' : ''}`}>
         <Sidebar />
-        <main className={`content ${isTimeline ? 'content-no-scale' : 'content-scaled'}`}>
+        <main className={`content ${isTimeline || isWorkers ? 'content-no-scale' : 'content-scaled'}`}>
           <Outlet />
         </main>
         {showAIPanel && <AIPanel />}

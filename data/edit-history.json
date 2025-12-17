@@ -804,5 +804,16 @@
     "old_value": "rejected",
     "new_value": "approved",
     "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-17T22:26:13.079710Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "manual"
   }
 ]

@@ -12,7 +12,7 @@ const ZOOM_MODES = {
 function Timeline() {
   const { t } = useTranslation();
   const { projects, updateProject } = useProjects();
-  const [zoomMode, setZoomMode] = useState(ZOOM_MODES.WEEK);
+  const [zoomMode, setZoomMode] = useState(ZOOM_MODES.QUARTER);
   const tableWrapperRef = useRef(null);
   const [editingProject, setEditingProject] = useState(null);
   const [editFormData, setEditFormData] = useState({});
