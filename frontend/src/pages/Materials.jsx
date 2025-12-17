@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useAIPanel } from '../contexts/AppContext.jsx';
+import { useProjects } from '../contexts/ProjectsContext.jsx';
 import EditableMaterialsTable from '../components/EditableMaterialsTable.jsx';
 import { MATERIALS_RELOAD_EVENT } from '../hooks/useMaterialsData.js';
 
@@ -8,6 +9,7 @@ function Materials() {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const { setIsAIPanelOpen } = useAIPanel();
+  const { selectedProject } = useProjects();
   const handleReload = () => {
     window.dispatchEvent(new CustomEvent(MATERIALS_RELOAD_EVENT));
   };
@@ -25,7 +27,12 @@ function Materials() {
     <>
       <header className="content-header">
         <div>
-          <h2>{t('materialsTitle')}</h2>
+          <h2>
+            {selectedProject 
+              ? `${t('materialsTitle')} - ${selectedProject.address || selectedProject.name || ''}`
+              : t('materialsTitle')
+            }
+          </h2>
           <p>{t('materialsSubtitle')}</p>
         </div>
       </header>

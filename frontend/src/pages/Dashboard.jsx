@@ -1,12 +1,14 @@
 import { useMaterialsData, formatCurrency } from '../hooks/useMaterialsData.js';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useRole } from '../contexts/AppContext.jsx';
+import { useProjects } from '../contexts/ProjectsContext.jsx';
 import WorkersCard from '../components/WorkersCard.jsx';
 
 function Dashboard() {
   const { data, loading, error, metrics } = useMaterialsData();
   const { t } = useTranslation();
   const { role } = useRole();
+  const { selectedProject } = useProjects();
 
   // Role-specific context - in future phases, filter metrics/items based on role
   // For now, all roles see the same data, but UI can be customized
@@ -15,7 +17,25 @@ function Dashboard() {
     <>
       <header className="content-header">
         <div>
-          <h2>{t('dashboardTitle')}</h2>
+          <h2>
+            {selectedProject ? (
+              <>
+                {selectedProject.address || selectedProject.name || t('dashboardTitle')}
+                {selectedProject.clientName && (
+                  <span style={{ 
+                    fontSize: '0.85rem', 
+                    fontWeight: 400, 
+                    color: '#6b7280',
+                    marginLeft: '12px'
+                  }}>
+                    · {selectedProject.clientName}
+                  </span>
+                )}
+              </>
+            ) : (
+              t('dashboardTitle')
+            )}
+          </h2>
           <p>{t('dashboardSubtitle')}</p>
         </div>
       </header>

@@ -15,9 +15,8 @@ function GlobalDashboard() {
 
   const handleProjectClick = (projectId) => {
     selectProject(projectId);
-    // Set flag to open AI panel when navigating to materials page
-    sessionStorage.setItem('openAIPanel', 'true');
-    navigate('/materials');
+    // Navigate to tracking dashboard for the selected project
+    navigate('/dashboard');
   };
 
   // Separate demo projects from regular projects
