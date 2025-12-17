@@ -25,13 +25,14 @@ SYSTEM_PROMPT_PATH = os.path.join(BASE_DIR, 'prompts', 'system_prompt.md')
 app = FastAPI(title="Renovation Contractor API")
 
 # CORS configuration for React frontend
+# Allow origins from environment variable or default to localhost for development
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174,http://localhost:5175")
+# Split comma-separated origins and filter out empty strings
+allowed_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-    ],  # Common Vite dev ports
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -760,5 +760,49 @@
     "old_value": null,
     "new_value": "rejected",
     "source": "agent"
+  },
+  {
+    "timestamp": "2025-12-10T17:15:52.161192Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "agent"
+  },
+  {
+    "timestamp": "2025-12-10T17:16:39.672541Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "rejected",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-10T17:24:41.152265Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "chantier",
+    "old_value": "alexis roche",
+    "new_value": "Alexis Roche Paris Apt",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2025-12-16T19:56:58.170426Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 0,
+    "product": "Mitigeur Grohe Blue",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "manual"
   }
 ]

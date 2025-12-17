@@ -1,0 +1,864 @@
+import { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from '../hooks/useTranslation.js';
+import { useProjects } from '../contexts/ProjectsContext.jsx';
+
+const ZOOM_MODES = {
+  DAY: 'day',
+  WEEK: 'week',
+  MONTH: 'month',
+  QUARTER: 'quarter',
+  YEAR: 'year',
+};
+
+function Timeline() {
+  const { t } = useTranslation();
+  const { projects, updateProject, createProject } = useProjects();
+  const [zoomMode, setZoomMode] = useState(ZOOM_MODES.MONTH);
+  const [editingProject, setEditingProject] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    address: '',
+    clientName: '',
+    startDate: '',
+    endDate: '',
+  });
+  
+  const [centerDate, setCenterDate] = useState(() => {
+    const now = new Date();
+    now.setDate(15);
+    return now;
+  });
+  
+  // ============================================================================
+  // SIMPLE DATE UTILITIES - Single source of truth
+  // ============================================================================
+  
+  /**
+   * Convert any date input to a clean Date object (year, month, day only)
+   * This avoids all timezone issues by extracting date parts directly
+   */
+  const toDate = (dateInput) => {
+    if (!dateInput) return null;
+    let d;
+    if (dateInput instanceof Date) {
+      d = dateInput;
+    } else if (typeof dateInput === 'string') {
+      // Handle ISO strings like '2023-12-30' or '2023-12-30T00:00:00.000Z'
+      // Extract date parts directly to avoid timezone conversion
+      const parts = dateInput.split('T')[0].split('-');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+      }
+      d = new Date(dateInput);
+    } else {
+      d = new Date(dateInput);
+    }
+    // Extract date parts to avoid timezone shifts
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+
+  /**
+   * Get project start and end dates - THE ONLY PLACE dates are retrieved
+   */
+  const getProjectDates = (project) => {
+    const start = project.startDate 
+      ? toDate(project.startDate)
+      : (project.createdAt ? toDate(project.createdAt) : new Date());
+    
+    const end = project.endDate 
+      ? toDate(project.endDate)
+      : new Date(start.getFullYear(), start.getMonth() + 6, start.getDate());
+    
+    return {
+      start: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
+      end: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999),
+    };
+  };
+
+  // Get all projects sorted by start date
+  const allProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      const datesA = getProjectDates(a);
+      const datesB = getProjectDates(b);
+      return datesA.start.getTime() - datesB.start.getTime();
+    });
+  }, [projects]);
+
+  // Calculate timeline range from all projects
+  // This range MUST include all project dates
+  const timelineRange = useMemo(() => {
+    if (allProjects.length === 0) {
+      const now = new Date();
+      return {
+        start: new Date(now.getFullYear(), now.getMonth() - 2, 1),
+        end: new Date(now.getFullYear(), now.getMonth() + 10, 0),
+      };
+    }
+
+    let minStart = null;
+    let maxEnd = null;
+
+    allProjects.forEach(project => {
+      const { start, end } = getProjectDates(project);
+      // Ensure we capture the exact project dates
+      if (!minStart || start < minStart) minStart = new Date(start);
+      if (!maxEnd || end > maxEnd) maxEnd = new Date(end);
+    });
+
+    // Add padding (1 month before earliest project, 3 months after latest project)
+    // Ensure we start from the 1st of the month for consistency
+    const start = new Date(minStart.getFullYear(), minStart.getMonth() - 1, 1);
+    start.setHours(0, 0, 0, 0);
+    
+    // End on the last day of the month, 3 months after the latest project
+    const end = new Date(maxEnd.getFullYear(), maxEnd.getMonth() + 3, 0);
+    end.setHours(23, 59, 59, 999);
+    
+    return { start, end };
+  }, [allProjects]);
+
+  // Generate time units for headers - SIMPLE AND CLEAR
+  const timeUnits = useMemo(() => {
+    if (!timelineRange.start || !timelineRange.end) return [];
+    
+    const units = [];
+    const rangeStart = toDate(timelineRange.start);
+    const rangeEnd = toDate(timelineRange.end);
+    let current = new Date(rangeStart);
+    
+    switch (zoomMode) {
+      case ZOOM_MODES.DAY:
+        current.setHours(0, 0, 0, 0);
+        while (current <= rangeEnd) {
+          units.push({ date: new Date(current), type: 'day' });
+          current.setDate(current.getDate() + 1);
+        }
+        break;
+      
+      case ZOOM_MODES.WEEK:
+        // Find Monday of the week containing rangeStart
+        const dayOfWeek = current.getDay();
+        const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        current.setDate(current.getDate() + daysToMonday);
+        current.setHours(0, 0, 0, 0);
+        while (current <= rangeEnd) {
+          units.push({ date: new Date(current), type: 'week' });
+          current.setDate(current.getDate() + 7);
+        }
+        break;
+      
+      case ZOOM_MODES.MONTH:
+        current.setDate(1);
+        current.setHours(0, 0, 0, 0);
+        while (current <= rangeEnd) {
+          units.push({ date: new Date(current), type: 'month' });
+          current.setMonth(current.getMonth() + 1);
+        }
+        break;
+      
+      case ZOOM_MODES.QUARTER:
+        current.setMonth(Math.floor(current.getMonth() / 3) * 3);
+        current.setDate(1);
+        current.setHours(0, 0, 0, 0);
+        while (current <= rangeEnd) {
+          units.push({ date: new Date(current), type: 'quarter' });
+          current.setMonth(current.getMonth() + 3);
+        }
+        break;
+      
+      case ZOOM_MODES.YEAR:
+        current.setMonth(0);
+        current.setDate(1);
+        current.setHours(0, 0, 0, 0);
+        while (current <= rangeEnd) {
+          units.push({ date: new Date(current), type: 'year' });
+          current.setFullYear(current.getFullYear() + 1);
+        }
+        break;
+    }
+
+    return units;
+  }, [zoomMode, timelineRange]);
+
+  // Get end date of a time unit
+  const getUnitEnd = (unitDate, unitType) => {
+    const end = new Date(unitDate);
+    switch (unitType) {
+      case 'day':
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'week':
+        end.setDate(end.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'month':
+        end.setMonth(end.getMonth() + 1);
+        end.setDate(0);
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'quarter':
+        end.setMonth(end.getMonth() + 3);
+        end.setDate(0);
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'year':
+        end.setFullYear(end.getFullYear() + 1);
+        end.setMonth(0);
+        end.setDate(0);
+        end.setHours(23, 59, 59, 999);
+        break;
+    }
+    return end;
+  };
+
+  // ============================================================================
+  // PROJECT BAR POSITIONING - EXACT DATE ALIGNMENT
+  // ============================================================================
+  
+  /**
+   * Calculate project bar position - bars MUST align exactly with header dates
+   * CRITICAL: Time units are displayed with EQUAL WIDTHS, so we must calculate
+   * position based on which unit contains the date + offset within that unit
+   */
+  const getProjectBarStyle = (project) => {
+    if (timeUnits.length === 0) {
+      return { display: 'none' };
+    }
+
+    // Get project dates
+    const { start: projStart, end: projEnd } = getProjectDates(project);
+    const projectStart = new Date(projStart.getFullYear(), projStart.getMonth(), projStart.getDate());
+    projectStart.setHours(0, 0, 0, 0);
+    const projectEnd = new Date(projEnd.getFullYear(), projEnd.getMonth(), projEnd.getDate());
+    projectEnd.setHours(23, 59, 59, 999);
+
+    // Find which time units contain the project start and end dates
+    let startUnitIndex = -1;
+    let endUnitIndex = -1;
+    let startOffsetInUnit = 0; // 0-1, percentage within the unit
+    let endOffsetInUnit = 0;
+
+    // Find the unit containing project start
+    // CRITICAL: Check each unit to find which one contains the project start date
+    for (let i = 0; i < timeUnits.length; i++) {
+      const unit = timeUnits[i];
+      const unitStart = new Date(unit.date);
+      unitStart.setHours(0, 0, 0, 0);
+      const unitEnd = getUnitEnd(unit.date, unit.type);
+
+      // Check if project start falls within this unit's date range
+      if (projectStart.getTime() >= unitStart.getTime() && projectStart.getTime() <= unitEnd.getTime()) {
+        startUnitIndex = i;
+        // Calculate offset within this unit (0.0 to 1.0)
+        // This tells us where within the unit the date falls
+        const unitSpan = unitEnd.getTime() - unitStart.getTime();
+        if (unitSpan > 0) {
+          const offsetMs = projectStart.getTime() - unitStart.getTime();
+          startOffsetInUnit = Math.max(0, Math.min(1, offsetMs / unitSpan));
+        } else {
+          startOffsetInUnit = 0;
+        }
+        break;
+      }
+    }
+
+    // Find the unit containing project end
+    for (let i = timeUnits.length - 1; i >= 0; i--) {
+      const unit = timeUnits[i];
+      const unitStart = new Date(unit.date);
+      unitStart.setHours(0, 0, 0, 0);
+      const unitEnd = getUnitEnd(unit.date, unit.type);
+
+      // Check if project end falls within this unit's date range
+      if (projectEnd.getTime() >= unitStart.getTime() && projectEnd.getTime() <= unitEnd.getTime()) {
+        endUnitIndex = i;
+        // Calculate offset within this unit (0.0 to 1.0)
+        const unitSpan = unitEnd.getTime() - unitStart.getTime();
+        if (unitSpan > 0) {
+          const offsetMs = projectEnd.getTime() - unitStart.getTime();
+          endOffsetInUnit = Math.max(0, Math.min(1, offsetMs / unitSpan));
+        } else {
+          endOffsetInUnit = 1;
+        }
+        break;
+      }
+    }
+
+    // Handle projects that extend beyond the visible units
+    if (startUnitIndex === -1) {
+      const firstUnitStart = new Date(timeUnits[0].date);
+      firstUnitStart.setHours(0, 0, 0, 0);
+      if (projectStart < firstUnitStart) {
+        startUnitIndex = 0;
+        startOffsetInUnit = 0;
+      } else {
+        return { display: 'none' };
+      }
+    }
+
+    if (endUnitIndex === -1) {
+      const lastUnit = timeUnits[timeUnits.length - 1];
+      const lastUnitEnd = getUnitEnd(lastUnit.date, lastUnit.type);
+      if (projectEnd > lastUnitEnd) {
+        endUnitIndex = timeUnits.length - 1;
+        endOffsetInUnit = 1;
+      } else {
+        return { display: 'none' };
+      }
+    }
+
+    // Each unit takes equal width (100% / number of units)
+    const widthPerUnit = 100 / timeUnits.length;
+
+    // Calculate left position: unit index * width + offset within unit
+    const leftPercent = (startUnitIndex * widthPerUnit) + (startOffsetInUnit * widthPerUnit);
+    
+    // Calculate right position: unit index * width + offset within unit
+    const rightPercent = (endUnitIndex * widthPerUnit) + (endOffsetInUnit * widthPerUnit);
+
+    const widthPercent = rightPercent - leftPercent;
+
+    if (widthPercent < 0.1) {
+      return { display: 'none' };
+    }
+
+    // Determine if cut off (for border radius)
+    const fullRangeStart = toDate(timelineRange.start);
+    const fullRangeEnd = toDate(timelineRange.end);
+    const isCutOffLeft = projectStart < fullRangeStart;
+    const isCutOffRight = projectEnd > fullRangeEnd;
+
+    let borderRadius = '6px';
+    if (isCutOffLeft && isCutOffRight) {
+      borderRadius = '0';
+    } else if (isCutOffLeft) {
+      borderRadius = '0 6px 6px 0';
+    } else if (isCutOffRight) {
+      borderRadius = '6px 0 0 6px';
+    }
+
+    return {
+      left: `${Math.max(0, Math.min(100, leftPercent))}%`,
+      width: `${Math.max(0.1, Math.min(100, widthPercent))}%`,
+      display: 'block',
+      borderRadius,
+    };
+  };
+
+  // Current date indicator
+  const getCurrentDateIndicatorStyle = () => {
+    if (timeUnits.length === 0) {
+      return { display: 'none' };
+    }
+
+    const now = toDate(new Date());
+    const firstUnit = timeUnits[0];
+    const lastUnit = timeUnits[timeUnits.length - 1];
+    const timelineStart = new Date(firstUnit.date);
+    timelineStart.setHours(0, 0, 0, 0);
+    const timelineEnd = getUnitEnd(lastUnit.date, lastUnit.type);
+
+    if (now < timelineStart || now > timelineEnd) {
+      return { display: 'none' };
+    }
+
+    const timelineSpan = timelineEnd.getTime() - timelineStart.getTime();
+    const nowOffset = now.getTime() - timelineStart.getTime();
+    const leftPercent = (nowOffset / timelineSpan) * 100;
+
+    return {
+      left: `${Math.max(0, Math.min(100, leftPercent))}%`,
+      display: 'block',
+    };
+  };
+
+  // Format project info for display
+  const getProjectDisplayInfo = (project) => {
+    const address = project.address || project.name || 'No address';
+    const clientName = project.clientName || 'No client';
+    const { start, end } = getProjectDates(project);
+    const percentagePaid = project.percentagePaid ?? null;
+    
+    const formatDate = (date) => {
+      return date.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    };
+    
+    const startDateStr = formatDate(start);
+    const hasEndDate = project.endDate !== null && project.endDate !== undefined;
+    const endDateStr = hasEndDate ? formatDate(end) : 'En cours';
+    
+    let statusText = '';
+    let percentage = percentagePaid;
+    
+    if (project.status === 'completed') {
+      statusText = 'Levée de réserve';
+      percentage = percentagePaid ?? 100;
+    } else if (project.status === 'active') {
+      statusText = 'Chantier en cours';
+      percentage = percentagePaid ?? 50;
+    } else if (project.status === 'ready' && project.devisStatus === 'approved') {
+      statusText = 'Devis signé - Prépa. chantier';
+      percentage = percentagePaid ?? 100;
+    } else if (project.status === 'ready') {
+      statusText = 'Devis envoyé';
+      percentage = percentagePaid ?? 90;
+    } else if (project.status === 'draft') {
+      statusText = 'Devis à réaliser';
+      percentage = percentagePaid ?? 50;
+    }
+    
+    return {
+      address,
+      clientName,
+      startDateStr,
+      endDateStr,
+      statusText,
+      percentage,
+    };
+  };
+
+  // Initialize center date
+  useEffect(() => {
+    if (timelineRange && timelineRange.start) {
+      const rangeStart = new Date(timelineRange.start);
+      const rangeEnd = new Date(timelineRange.end);
+      const middle = new Date((rangeStart.getTime() + rangeEnd.getTime()) / 2);
+      middle.setDate(15);
+      const today = new Date();
+      today.setDate(15);
+      if (Math.abs(centerDate.getTime() - today.getTime()) < 24 * 60 * 60 * 1000) {
+        setCenterDate(middle);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timelineRange]);
+
+  // Navigation
+  const getUnitsToShow = () => {
+    switch (zoomMode) {
+      case ZOOM_MODES.DAY: return 60;
+      case ZOOM_MODES.WEEK: return 26;
+      case ZOOM_MODES.MONTH: return 12;
+      case ZOOM_MODES.QUARTER: return 8;
+      case ZOOM_MODES.YEAR: return 5;
+      default: return 12;
+    }
+  };
+
+  const navigateUnits = (direction) => {
+    const newCenter = new Date(centerDate);
+    const unitsToShow = getUnitsToShow();
+    
+    switch (zoomMode) {
+      case ZOOM_MODES.DAY:
+        newCenter.setDate(newCenter.getDate() + direction * Math.floor(unitsToShow / 3));
+        break;
+      case ZOOM_MODES.WEEK:
+        newCenter.setDate(newCenter.getDate() + (direction * 7 * Math.floor(unitsToShow / 3)));
+        break;
+      case ZOOM_MODES.MONTH:
+        newCenter.setMonth(newCenter.getMonth() + direction * Math.floor(unitsToShow / 3));
+        break;
+      case ZOOM_MODES.QUARTER:
+        newCenter.setMonth(newCenter.getMonth() + (direction * 3 * Math.floor(unitsToShow / 3)));
+        break;
+      case ZOOM_MODES.YEAR:
+        newCenter.setFullYear(newCenter.getFullYear() + direction * Math.floor(unitsToShow / 3));
+        break;
+    }
+    
+    const minCenter = new Date(timelineRange.start);
+    minCenter.setDate(15);
+    const maxCenter = new Date(timelineRange.end);
+    maxCenter.setDate(15);
+    
+    if (newCenter < minCenter) {
+      setCenterDate(minCenter);
+    } else if (newCenter > maxCenter) {
+      setCenterDate(maxCenter);
+    } else {
+      setCenterDate(newCenter);
+    }
+  };
+
+  const goToToday = () => {
+    const today = new Date();
+    today.setDate(15);
+    today.setHours(0, 0, 0, 0);
+    
+    const minCenter = new Date(timelineRange.start);
+    minCenter.setDate(15);
+    const maxCenter = new Date(timelineRange.end);
+    maxCenter.setDate(15);
+    
+    if (today < minCenter) {
+      setCenterDate(minCenter);
+    } else if (today > maxCenter) {
+      setCenterDate(maxCenter);
+    } else {
+      setCenterDate(today);
+    }
+  };
+
+  const handleEditProject = (project) => {
+    setEditingProject(project);
+    const startDate = project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '';
+    const endDate = project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '';
+    setEditFormData({
+      address: project.address || project.name || '',
+      clientName: project.clientName || '',
+      startDate: startDate,
+      endDate: endDate,
+    });
+  };
+
+  const handleCloseEdit = () => {
+    setEditingProject(null);
+    setEditFormData({
+      address: '',
+      clientName: '',
+      startDate: '',
+      endDate: '',
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingProject) return;
+
+    const updates = {
+      address: editFormData.address,
+      clientName: editFormData.clientName,
+      name: editFormData.address || editingProject.name,
+      startDate: editFormData.startDate ? new Date(editFormData.startDate).toISOString() : null,
+      endDate: editFormData.endDate ? new Date(editFormData.endDate).toISOString() : null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    Object.keys(updates).forEach(key => {
+      if (updates[key] === null || updates[key] === '') {
+        delete updates[key];
+      }
+    });
+
+    if (editingProject.id && editingProject.id.startsWith('timeline-demo-')) {
+      createProject({
+        ...editingProject,
+        ...updates,
+        isDemo: false,
+      });
+    } else {
+      updateProject(editingProject.id, updates);
+    }
+    
+    handleCloseEdit();
+  };
+
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  return (
+    <>
+      <header className="content-header">
+        <div>
+          <h2>{t('timelineTitle')}</h2>
+          <p>{t('timelineSubtitle')}</p>
+        </div>
+        <div className="timeline-controls-wrapper">
+          <div className="timeline-zoom-controls">
+            <button
+              type="button"
+              className={`timeline-zoom-btn ${zoomMode === ZOOM_MODES.DAY ? 'active' : ''}`}
+              onClick={() => setZoomMode(ZOOM_MODES.DAY)}
+              title={t('zoomDay')}
+            >
+              {t('zoomDay')}
+            </button>
+            <button
+              type="button"
+              className={`timeline-zoom-btn ${zoomMode === ZOOM_MODES.WEEK ? 'active' : ''}`}
+              onClick={() => setZoomMode(ZOOM_MODES.WEEK)}
+              title={t('zoomWeek')}
+            >
+              {t('zoomWeek')}
+            </button>
+            <button
+              type="button"
+              className={`timeline-zoom-btn ${zoomMode === ZOOM_MODES.MONTH ? 'active' : ''}`}
+              onClick={() => setZoomMode(ZOOM_MODES.MONTH)}
+              title={t('zoomMonth')}
+            >
+              {t('zoomMonth')}
+            </button>
+            <button
+              type="button"
+              className={`timeline-zoom-btn ${zoomMode === ZOOM_MODES.QUARTER ? 'active' : ''}`}
+              onClick={() => setZoomMode(ZOOM_MODES.QUARTER)}
+              title={t('zoomQuarter')}
+            >
+              {t('zoomQuarter')}
+            </button>
+            <button
+              type="button"
+              className={`timeline-zoom-btn ${zoomMode === ZOOM_MODES.YEAR ? 'active' : ''}`}
+              onClick={() => setZoomMode(ZOOM_MODES.YEAR)}
+              title={t('zoomYear')}
+            >
+              {t('zoomYear')}
+            </button>
+          </div>
+          <div className="timeline-controls">
+            <button
+              type="button"
+              className="timeline-nav-btn"
+              onClick={() => navigateUnits(-1)}
+              disabled={centerDate <= new Date(timelineRange.start)}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="timeline-nav-btn"
+              onClick={goToToday}
+            >
+              {t('today')}
+            </button>
+            <button
+              type="button"
+              className="timeline-nav-btn"
+              onClick={() => navigateUnits(1)}
+              disabled={centerDate >= new Date(timelineRange.end)}
+            >
+              ›
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="timeline-container">
+        {allProjects.length === 0 ? (
+          <div className="timeline-empty-state">
+            <p>{t('noProjectsTimeline')}</p>
+          </div>
+        ) : (
+          <div className="timeline-content-wrapper">
+            <div className="timeline-projects-list">
+              <div className="timeline-projects-header">
+                <h3>{t('projectName')}</h3>
+              </div>
+              <div className="timeline-projects-items">
+                {allProjects.map((project) => {
+                  const info = getProjectDisplayInfo(project);
+                  return (
+                    <div
+                      key={project.id}
+                      className="timeline-project-row"
+                      style={{ minHeight: '60px' }}
+                    >
+                      <div className="timeline-project-info">
+                        <div className="timeline-project-name">
+                          {info.address} / {info.clientName}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="timeline-calendar-container">
+              <div className="timeline-months">
+                {timeUnits && timeUnits.length > 0 ? timeUnits.map((unit) => {
+                  const widthPercent = 100 / timeUnits.length;
+                  let headerText = '';
+                  let subHeaders = [];
+                  
+                  switch (unit.type) {
+                    case 'day':
+                      headerText = unit.date.toLocaleDateString('fr-FR', { 
+                        weekday: 'short', 
+                        day: 'numeric',
+                        month: 'short'
+                      });
+                      break;
+                    case 'week':
+                      const weekEnd = new Date(unit.date);
+                      weekEnd.setDate(weekEnd.getDate() + 6);
+                      headerText = `Sem. ${unit.date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} - ${weekEnd.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
+                      break;
+                    case 'month':
+                      headerText = unit.date.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+                      const daysInMonth = getDaysInMonth(unit.date);
+                      subHeaders = Array.from({ length: Math.ceil(daysInMonth / 7) }, (_, i) => i * 7 + 1);
+                      break;
+                    case 'quarter':
+                      const quarterMonth = unit.date.getMonth();
+                      const quarterNum = Math.floor(quarterMonth / 3) + 1;
+                      headerText = `T${quarterNum} ${unit.date.getFullYear()}`;
+                      break;
+                    case 'year':
+                      headerText = unit.date.getFullYear().toString();
+                      break;
+                  }
+                  
+                  return (
+                    <div
+                      key={`${unit.type}-${unit.date.getTime()}`}
+                      className="timeline-month-header"
+                      style={{ width: `${widthPercent}%` }}
+                    >
+                      <div className="timeline-month-name">{headerText}</div>
+                      {subHeaders.length > 0 && (
+                        <div className="timeline-month-days">
+                          {subHeaders.map((day, i) => (
+                            <div key={i} className="timeline-week-marker">
+                              {day}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }) : <div className="timeline-loading">Loading timeline...</div>}
+              </div>
+
+              <div className="timeline-bars-container">
+                {timeUnits && timeUnits.length > 0 ? allProjects.map((project) => {
+                  const info = getProjectDisplayInfo(project);
+                  const barStyle = getProjectBarStyle(project);
+                  const isCompleted = project.status === 'completed' || info.percentage === 100;
+                  const shouldShowBar = barStyle.display !== 'none';
+                  
+                  return (
+                    <div key={project.id} className="timeline-project-bar-row">
+                      {shouldShowBar ? (
+                        <div
+                          className={`timeline-project-bar ${isCompleted ? 'completed' : 'in-progress'}`}
+                          style={barStyle}
+                          title={`${info.address} / ${info.clientName} - ${info.startDateStr} → ${info.endDateStr} - ${info.statusText} ${info.percentage}%`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditProject(project);
+                          }}
+                        >
+                          <div className="timeline-project-bar-content">
+                            <div className="timeline-project-bar-text">
+                              <strong>{info.address} / {info.clientName}</strong>
+                            </div>
+                            <div className="timeline-project-bar-dates">
+                              {info.startDateStr} → {info.endDateStr}
+                            </div>
+                            <div className="timeline-project-bar-status">
+                              {info.statusText} {info.percentage}%
+                              {info.percentage === 100 && (
+                                <span className="timeline-status-indicator completed">●</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          className="timeline-project-bar-out-of-view"
+                          title={`${info.address} / ${info.clientName} - ${info.startDateStr} → ${info.endDateStr} - ${info.statusText} ${info.percentage}% (out of view)`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditProject(project);
+                          }}
+                        >
+                          <span className="timeline-out-of-view-indicator">...</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }) : null}
+              </div>
+
+              <div
+                className="timeline-current-date-indicator"
+                style={getCurrentDateIndicatorStyle()}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {editingProject && (
+        <div className="timeline-edit-modal-overlay" onClick={handleCloseEdit}>
+          <div className="timeline-edit-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="timeline-edit-modal-header">
+              <h3>{t('editProject')}</h3>
+              <button
+                type="button"
+                className="timeline-edit-modal-close"
+                onClick={handleCloseEdit}
+              >
+                ×
+              </button>
+            </div>
+            <div className="timeline-edit-modal-body">
+              <div className="timeline-edit-field">
+                <label htmlFor="edit-address">{t('projectAddress')}</label>
+                <input
+                  id="edit-address"
+                  type="text"
+                  value={editFormData.address}
+                  onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                  placeholder={t('projectAddressPlaceholder')}
+                />
+              </div>
+              <div className="timeline-edit-field">
+                <label htmlFor="edit-client">{t('clientName')}</label>
+                <input
+                  id="edit-client"
+                  type="text"
+                  value={editFormData.clientName}
+                  onChange={(e) => setEditFormData({ ...editFormData, clientName: e.target.value })}
+                  placeholder={t('clientNamePlaceholder')}
+                />
+              </div>
+              <div className="timeline-edit-field">
+                <label htmlFor="edit-start-date">{t('startDate')}</label>
+                <input
+                  id="edit-start-date"
+                  type="date"
+                  value={editFormData.startDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
+                />
+              </div>
+              <div className="timeline-edit-field">
+                <label htmlFor="edit-end-date">{t('endDate')}</label>
+                <input
+                  id="edit-end-date"
+                  type="date"
+                  value={editFormData.endDate}
+                  onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="timeline-edit-modal-footer">
+              <button
+                type="button"
+                className="timeline-edit-btn-cancel"
+                onClick={handleCloseEdit}
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                className="timeline-edit-btn-save"
+                onClick={handleSaveEdit}
+              >
+                {t('save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export default Timeline;

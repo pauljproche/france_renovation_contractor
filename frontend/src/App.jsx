@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Materials from './pages/Materials.jsx';
 import ChatHistory from './pages/ChatHistory.jsx';
 import Settings from './pages/Settings.jsx';
+import Timeline from './pages/Timeline.jsx';
 import ClientValidation from './pages/ClientValidation.jsx';
 import ClientMaterials from './pages/ClientMaterials.jsx';
 import EditHistory from './pages/EditHistory.jsx';
@@ -33,6 +34,7 @@ function App() {
                 <Route element={<Layout />}>
                   <Route path="/global-dashboard" element={<GlobalDashboard />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/timeline" element={<Timeline />} />
                   <Route path="/dashboard" element={
                     <ProtectedTrackingRoute>
                       <Dashboard />

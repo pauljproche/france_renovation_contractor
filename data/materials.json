@@ -15,9 +15,9 @@
           },
           "approvals": {
             "client": {
-              "status": "rejected",
+              "status": "approved",
               "note": null,
-              "validatedAt": "2025-12-03T18:40:22.171Z",
+              "validatedAt": "2025-12-16T19:56:52.376Z",
               "replacementUrls": [
                 "hellocat123",
                 "weeeee",
@@ -271,7 +271,7 @@
             "cray": null,
             "client": null
           },
-          "chantier": "alexis roche"
+          "chantier": "Alexis Roche Paris Apt"
         },
         {
           "product": "",

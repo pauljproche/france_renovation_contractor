@@ -10,38 +10,230 @@ const PENDING_APPROVAL_DEMO_PROJECT_ID = 'pending-approval-demo-project';
 const DEMO_PROJECT = {
   id: DEMO_PROJECT_ID,
   name: 'Demo Renovation Project',
-  createdAt: new Date('2024-01-01').toISOString(),
-  updatedAt: new Date().toISOString(),
+  address: 'Demo Renovation Project',
+  clientName: 'No client',
+  createdAt: new Date('2025-12-31').toISOString(),
+  updatedAt: new Date('2025-12-31').toISOString(),
+  startDate: new Date('2025-12-31').toISOString(),
   status: 'active',
   isDemo: true,
   hasData: true, // Uses existing materials.json
   devisStatus: 'approved', // sent, approved, rejected
   invoiceCount: 2, // Number of invoices sent
+  percentagePaid: 50,
 };
 
 const EMPTY_DEMO_PROJECT = {
   id: EMPTY_DEMO_PROJECT_ID,
   name: 'Empty Demo Project',
-  createdAt: new Date('2024-01-01').toISOString(),
-  updatedAt: new Date().toISOString(),
+  address: 'Empty Demo Project',
+  clientName: 'No client',
+  createdAt: new Date('2025-12-31').toISOString(),
+  updatedAt: new Date('2025-12-31').toISOString(),
+  startDate: new Date('2025-12-31').toISOString(),
   status: 'draft',
   isDemo: true,
   hasData: false, // No data - empty state
   devisStatus: null, // No devis yet
   invoiceCount: 0,
+  percentagePaid: 50,
 };
 
 const PENDING_APPROVAL_DEMO_PROJECT = {
   id: PENDING_APPROVAL_DEMO_PROJECT_ID,
   name: 'Bathroom Renovation - Paris Apartment',
-  createdAt: new Date('2024-10-15').toISOString(),
-  updatedAt: new Date('2024-11-01').toISOString(),
+  address: 'Bathroom Renovation - Paris Apartment',
+  clientName: 'No client',
+  createdAt: new Date('2025-10-14').toISOString(),
+  updatedAt: new Date('2025-10-14').toISOString(),
+  startDate: new Date('2025-10-14').toISOString(),
   status: 'ready',
   isDemo: true,
   hasData: true, // Has devis data but waiting for approval
   devisStatus: 'sent', // Devis sent to client, pending approval
   invoiceCount: 0, // No invoices yet - waiting for approval
+  percentagePaid: 90,
 };
+
+// Additional timeline demo projects
+const TIMELINE_DEMO_PROJECTS = [
+  {
+    id: 'timeline-demo-1',
+    name: '243 RUE ST JACQUES',
+    address: '243 RUE ST JACQUES',
+    clientName: 'Emmanuel Roche',
+    createdAt: new Date('2025-09-17').toISOString(),
+    updatedAt: new Date('2025-09-17').toISOString(),
+    startDate: new Date('2025-09-17').toISOString(),
+    endDate: new Date('2026-02-17').toISOString(), // 5 months
+    status: 'active',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'approved',
+    invoiceCount: 0,
+    percentagePaid: 50,
+  },
+  {
+    id: 'timeline-demo-2',
+    name: 'CERISAIE',
+    address: 'CERISAIE',
+    clientName: 'Grosjean',
+    createdAt: new Date('2025-06-01').toISOString(),
+    updatedAt: new Date('2025-06-01').toISOString(),
+    startDate: new Date('2025-06-01').toISOString(),
+    endDate: new Date('2025-11-15').toISOString(), // 5.5 months
+    status: 'active',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'approved',
+    invoiceCount: 1,
+    percentagePaid: 100,
+  },
+  {
+    id: 'timeline-demo-3',
+    name: 'Halle des Grésillons',
+    address: 'Halle des Grésillons',
+    clientName: '',
+    createdAt: new Date('2025-04-14').toISOString(),
+    updatedAt: new Date('2025-04-14').toISOString(),
+    startDate: new Date('2025-04-14').toISOString(),
+    endDate: new Date('2025-09-14').toISOString(), // 5 months
+    status: 'completed',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'approved',
+    invoiceCount: 3,
+    percentagePaid: 100,
+  },
+  {
+    id: 'timeline-demo-4',
+    name: 'BD AUGIER',
+    address: 'BD AUGIER',
+    clientName: 'Martin Chabrol',
+    createdAt: new Date('2025-08-15').toISOString(),
+    updatedAt: new Date('2025-08-15').toISOString(),
+    startDate: new Date('2025-08-15').toISOString(),
+    endDate: new Date('2025-12-20').toISOString(), // 4 months
+    status: 'active',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'approved',
+    invoiceCount: 1,
+    percentagePaid: 100,
+  },
+  {
+    id: 'timeline-demo-5',
+    name: '7 RUE BOULLE',
+    address: '7 RUE BOULLE',
+    clientName: 'Vienne&Berdon',
+    createdAt: new Date('2025-07-10').toISOString(),
+    updatedAt: new Date('2025-07-10').toISOString(),
+    startDate: new Date('2025-07-10').toISOString(),
+    endDate: new Date('2025-12-10').toISOString(), // 5 months
+    status: 'active',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'approved',
+    invoiceCount: 2,
+    percentagePaid: 90,
+  },
+  {
+    id: 'timeline-demo-6',
+    name: '16 AV GAL LECLERC',
+    address: '16 AV GAL LECLERC',
+    clientName: 'Elisabeth Mr Lambert (AALS)',
+    createdAt: new Date('2025-09-01').toISOString(),
+    updatedAt: new Date('2025-09-01').toISOString(),
+    startDate: new Date('2025-09-01').toISOString(),
+    endDate: new Date('2026-02-15').toISOString(), // 5.5 months
+    status: 'ready',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'sent',
+    invoiceCount: 0,
+    percentagePaid: 90,
+  },
+  {
+    id: 'timeline-demo-7',
+    name: 'BRUNEL',
+    address: 'BRUNEL',
+    clientName: 'Mr et Mme de La Source',
+    createdAt: new Date('2025-10-20').toISOString(),
+    updatedAt: new Date('2025-10-20').toISOString(),
+    startDate: new Date('2025-10-20').toISOString(),
+    endDate: new Date('2026-04-20').toISOString(), // 6 months
+    status: 'ready',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'approved',
+    invoiceCount: 0,
+    percentagePaid: 100,
+  },
+  {
+    id: 'timeline-demo-8',
+    name: 'CINIERI - PERRICHONT',
+    address: 'CINIERI - PERRICHONT',
+    clientName: '',
+    createdAt: new Date('2025-11-01').toISOString(),
+    updatedAt: new Date('2025-11-01').toISOString(),
+    startDate: new Date('2025-11-01').toISOString(),
+    endDate: new Date('2026-05-01').toISOString(), // 6 months
+    status: 'ready',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'sent',
+    invoiceCount: 0,
+    percentagePaid: 50,
+  },
+  {
+    id: 'timeline-demo-9',
+    name: 'SAINT NOM LA BRETECHE',
+    address: 'SAINT NOM LA BRETECHE',
+    clientName: 'Rejraji',
+    createdAt: new Date('2025-01-21').toISOString(),
+    updatedAt: new Date('2025-01-21').toISOString(),
+    startDate: new Date('2025-01-21').toISOString(),
+    endDate: new Date('2025-08-21').toISOString(), // 7 months
+    status: 'active',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'approved',
+    invoiceCount: 2,
+    percentagePaid: 100,
+  },
+  {
+    id: 'timeline-demo-10',
+    name: 'WAGRAM',
+    address: 'WAGRAM',
+    clientName: 'Mr et Mme LASOU',
+    createdAt: new Date('2025-05-10').toISOString(),
+    updatedAt: new Date('2025-05-10').toISOString(),
+    startDate: new Date('2025-05-10').toISOString(),
+    endDate: new Date('2025-10-10').toISOString(), // 5 months
+    status: 'active',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'approved',
+    invoiceCount: 1,
+    percentagePaid: 50,
+  },
+  {
+    id: 'timeline-demo-11',
+    name: 'DMG 9 Rue Duperré 9e Paris',
+    address: 'DMG 9 Rue Duperré 9e Paris',
+    clientName: 'David Marchenoir',
+    createdAt: new Date('2025-03-15').toISOString(),
+    updatedAt: new Date('2025-03-15').toISOString(),
+    startDate: new Date('2025-03-15').toISOString(),
+    endDate: new Date('2025-08-15').toISOString(), // 5 months
+    status: 'completed',
+    isDemo: true,
+    hasData: false,
+    devisStatus: 'approved',
+    invoiceCount: 3,
+    percentagePaid: 100,
+  },
+];
 
 export function ProjectsProvider({ children }) {
   const [projects, setProjects] = useState(() => {
@@ -290,6 +482,8 @@ export function ProjectsProvider({ children }) {
     if (!convertedDemoProjects.includes(PENDING_APPROVAL_DEMO_PROJECT_ID)) {
       demos.push(PENDING_APPROVAL_DEMO_PROJECT);
     }
+    // Add timeline demo projects (always include them for timeline view)
+    demos.push(...TIMELINE_DEMO_PROJECTS);
     return [...demos, ...projects];
   }, [projects, convertedDemoProjects]);
 

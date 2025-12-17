@@ -36,15 +36,16 @@ table {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .app-body {
   display: flex;
-  flex: 1 1 auto;
-  overflow: hidden;
+  flex: 1;
+  overflow: visible;
   position: relative;
-  height: 0;
-  min-height: 0;
+  min-height: 100vh;
   align-items: stretch;
 }
 
@@ -557,9 +558,106 @@ table {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  overflow-y: auto;
+  overflow: visible;
   transition: margin-right 0.3s ease;
   min-width: 0;
+  /* Ensure content doesn't overflow when AI panel is present */
+  max-width: 100%;
+}
+
+/* Scale all pages to 90% except timeline */
+.content-scaled {
+  transform: scale(0.9);
+  transform-origin: top left;
+  width: calc(100% / 0.9);
+  min-height: auto;
+  height: auto;
+  max-width: calc(100% / 0.9);
+  overflow: visible;
+  flex-shrink: 1;
+  flex-basis: auto;
+  box-sizing: border-box;
+  /* Negative margin compensates for extra width from scaling */
+  margin-right: calc(-100% * (1 - 0.9) / 0.9);
+  /* Base right padding: 24px visual = 26.67px before scaling */
+  padding-right: calc(24px / 0.9);
+}
+
+/* When AI panel is visible, increase padding to prevent overlap */
+.app-body.has-ai-panel .content-scaled {
+  /* When AI panel is present: 40px visual padding = 44.44px before scaling
+     This ensures content never overlaps the panel */
+  padding-right: calc(40px / 0.9);
+  /* Ensure content doesn't extend beyond bounds horizontally */
+  overflow-x: hidden !important;
+  overflow-y: visible;
+}
+
+/* Ensure all child elements respect the padded container */
+.app-body.has-ai-panel .content-scaled > * {
+  max-width: 100%;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+/* Ensure child elements fill available width in scaled content and respect container bounds */
+.content-scaled > * {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.content-scaled .materials-table-wrapper,
+.content-scaled .table-wrapper,
+.content-scaled .edit-history-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-y: visible;
+  /* Force tables to respect container bounds - critical for preventing AI panel overlap */
+  contain: layout style;
+  position: relative;
+}
+
+.content-scaled .table-container {
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.content-scaled .projects-grid {
+  width: 100%;
+}
+
+.content-scaled .materials-table {
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+  table-layout: auto;
+  box-sizing: border-box;
+}
+
+/* Ensure all tables and containers fill width in scaled content */
+.content-scaled table {
+  width: 100%;
+  min-width: 100%;
+}
+
+.content-scaled > div[style*="background"],
+.content-scaled > div[style*="overflow"] {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.content-no-scale {
+  /* Timeline page maintains its own scaling (67%) */
+  transform: none;
+  width: 100%;
+  min-height: auto;
 }
 
 .ai-panel {
@@ -569,12 +667,17 @@ table {
   border-left: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  max-height: 100%;
+  height: calc(100vh - 64px);
+  min-height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px);
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
   transition: width 0.3s ease, min-width 0.3s ease, opacity 0.3s ease, border 0.3s ease;
   overflow: hidden;
   flex-shrink: 0;
+  position: sticky;
+  top: 64px;
+  align-self: flex-start;
+  z-index: 10;
 }
 
 .ai-panel-hidden {
@@ -1078,6 +1181,11 @@ table {
   position: relative;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .table-controls {
@@ -1165,7 +1273,9 @@ table {
 .table-container {
   flex: 1;
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: auto;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .saving-indicator {
@@ -3562,5 +3672,601 @@ table {
 
 .theme-blue .action-dropdown-toggle:hover {
   background: #1d4ed8;
+}
+
+/* Timeline Page Styles */
+.timeline-controls-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.timeline-zoom-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  background: #f9fafb;
+  padding: 4px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.timeline-zoom-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.timeline-zoom-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.timeline-zoom-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.timeline-zoom-btn.active:hover {
+  background: #2563eb;
+}
+
+.timeline-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.timeline-nav-btn {
+  padding: 8px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  min-width: 40px;
+}
+
+.timeline-nav-btn:hover:not(:disabled) {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.timeline-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Timeline styles */
+.timeline-container {
+  padding: 0;
+  margin: 0;
+  /* Container scales to 67% - adjust dimensions to compensate */
+  width: calc(100% / 0.67);
+  min-height: calc(100% / 0.67);
+  overflow: visible;
+}
+
+.timeline-table-wrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc((100vh - 120px) / 0.67); /* Account for 0.67 scale transform */
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.timeline-table {
+  border-collapse: collapse;
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+  background: #fff;
+  border-spacing: 0;
+  margin: 0;
+}
+
+.timeline-table thead {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.timeline-table thead tr {
+  height: auto;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.timeline-table thead th {
+  vertical-align: bottom;
+  margin: 0;
+  border-top: none;
+}
+
+.timeline-project-header {
+  position: sticky;
+  left: 0;
+  z-index: 25;
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  padding: 18px 20px;
+  border-top: none;
+  border-left: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.8px;
+  color: #ffffff;
+  text-align: left;
+  text-transform: uppercase;
+  min-width: 280px;
+  max-width: 280px;
+  width: 280px;
+  box-shadow: 2px 0 8px rgba(79, 70, 229, 0.15), inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.timeline-time-header-group {
+  padding: 18px 14px;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  position: sticky;
+  top: 0;
+  z-index: 21;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap;
+  text-transform: capitalize;
+  line-height: 1.4;
+  overflow: visible;
+  letter-spacing: 0.3px;
+}
+
+.timeline-time-header {
+  padding: 12px 14px;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
+  position: sticky;
+  top: 56px;
+  z-index: 20;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+  text-transform: capitalize;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  overflow: visible;
+  word-break: keep-all;
+  transition: background-color 0.2s ease;
+}
+
+.timeline-time-header:hover {
+  background: linear-gradient(to bottom, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.timeline-project-row {
+  height: 60px;
+}
+
+.timeline-project-name {
+  position: sticky;
+  left: 0;
+  z-index: 30;
+  background: #ffffff;
+  padding: 14px 20px;
+  border-top: none;
+  border-left: none;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 280px;
+  max-width: 280px;
+  width: 280px;
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+  margin: 0;
+  vertical-align: middle;
+  border-radius: 0;
+}
+
+.timeline-project-row:hover .timeline-project-name {
+  background: #f8fafc;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
+}
+
+.timeline-time-cell {
+  border-right: 1px solid rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 0;
+  min-width: 130px;
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.15s ease;
+}
+
+.timeline-project-row:hover .timeline-time-cell {
+  background: #f8fafc;
+}
+
+.timeline-today-indicator {
+  position: absolute;
+  width: 3px;
+  background: linear-gradient(to bottom, #ef4444 0%, #dc2626 100%);
+  z-index: 22;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6), 0 0 4px rgba(239, 68, 68, 0.4);
+  border-radius: 2px;
+}
+
+.timeline-project-bar {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 4px;
+  right: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  max-width: calc(100% - 8px);
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.timeline-project-bar.in-progress {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+}
+
+.timeline-project-bar.completed {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+}
+
+.timeline-project-bar:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 15;
+  /* Ensure it doesn't extend beyond cell boundaries */
+  left: 4px;
+  right: 4px;
+  max-width: calc(100% - 8px);
+}
+
+/* Timeline Edit Modal */
+.timeline-edit-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.timeline-edit-modal {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.timeline-edit-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.timeline-edit-modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.timeline-edit-modal-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.timeline-edit-modal-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.timeline-edit-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.timeline-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timeline-edit-field label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.timeline-edit-field input,
+.timeline-edit-field select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.timeline-edit-field input:focus,
+.timeline-edit-field select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.timeline-edit-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.timeline-edit-btn-cancel,
+.timeline-edit-btn-save {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.timeline-edit-btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.timeline-edit-btn-cancel:hover {
+  background: #e5e7eb;
+}
+
+.timeline-edit-btn-save {
+  background: #3b82f6;
+  color: white;
+}
+
+.timeline-edit-btn-save:hover {
+  background: #2563eb;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .timeline-container {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .timeline-projects-list {
+    min-width: 100%;
+    max-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    max-height: 200px;
+  }
+
+  .timeline-month-header {
+    min-width: 150px;
+  }
+
+  .timeline-edit-modal {
+    width: 95%;
+    margin: 20px;
+  }
+}
+
+/* Timeline Edit Modal Styles */
+.timeline-edit-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.timeline-edit-modal {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-edit-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.timeline-edit-modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.timeline-edit-modal-close {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.timeline-edit-modal-close:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.timeline-edit-modal-content {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.timeline-edit-form-group {
+  margin-bottom: 20px;
+}
+
+.timeline-edit-form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  color: #374151;
+}
+
+.timeline-edit-form-group input,
+.timeline-edit-form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1f2937;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.timeline-edit-form-group input:focus,
+.timeline-edit-form-group select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.timeline-edit-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.timeline-edit-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.timeline-edit-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.timeline-edit-btn-cancel {
+  background: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.timeline-edit-btn-cancel:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.timeline-edit-btn-save {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.timeline-edit-btn-save:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
 }
 

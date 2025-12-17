@@ -1,0 +1,31 @@
+[Unit]
+Description=France Renovation Contractor Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+# Replace 'ubuntu' with your EC2 username (e.g., 'ec2-user' for Amazon Linux)
+
+WorkingDirectory=/opt/france-renovation/backend
+Environment="PATH=/opt/france-renovation/backend/venv/bin"
+
+# Load environment variables from .env file
+EnvironmentFile=/opt/france-renovation/backend/.env
+
+# Start uvicorn with production settings
+# Adjust workers based on CPU cores (workers = (2 * cores) + 1)
+ExecStart=/opt/france-renovation/backend/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4 --no-reload
+
+# Restart on failure
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=append:/opt/france-renovation/logs/backend.log
+StandardError=append:/opt/france-renovation/logs/backend.log
+
+[Install]
+WantedBy=multi-user.target
+
+

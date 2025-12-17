@@ -1,0 +1,31 @@
+[Unit]
+Description=France Renovation Contractor Zulip Bot
+After=network.target france-renovation-backend.service
+Requires=france-renovation-backend.service
+
+[Service]
+Type=simple
+User=ubuntu
+# Replace 'ubuntu' with your EC2 username (e.g., 'ec2-user' for Amazon Linux)
+
+WorkingDirectory=/opt/france-renovation
+Environment="PATH=/opt/france-renovation/backend/venv/bin"
+
+# Load environment variables from .env file
+EnvironmentFile=/opt/france-renovation/backend/.env
+
+# Start Zulip bot
+ExecStart=/opt/france-renovation/backend/venv/bin/python -m backend.zulip_bot.bot
+
+# Restart on failure
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=append:/opt/france-renovation/logs/bot.log
+StandardError=append:/opt/france-renovation/logs/bot.log
+
+[Install]
+WantedBy=multi-user.target
+
+
