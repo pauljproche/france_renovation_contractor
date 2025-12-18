@@ -7,23 +7,31 @@ Quick reference for database schema and SQL functions used in the migration.
 ### Tables Overview
 
 ```
-sections
-  ├── items
-  │   ├── approvals (one per role: client/cray)
-  │   │   └── replacement_urls (array as table)
-  │   ├── orders
-  │   ├── comments (one per role: client/cray)
-  │   └── custom_fields
-  └── edit_history (references items)
+projects
+  └── sections
+      └── items
+          ├── approvals (one per role: client/cray)
+          │   └── replacement_urls (array as table)
+          ├── orders
+          ├── comments (one per role: client/cray)
+          └── custom_fields
+
+workers
+  └── worker_jobs (links workers to projects via chantier_name)
+
+edit_history (references items)
 ```
 
 ### Key Relationships
 
+- `sections.project_id` → `projects.id` (many-to-one)
 - `items.section_id` → `sections.id` (many-to-one)
 - `approvals.item_id` → `items.id` (one-to-many, unique per role)
 - `replacement_urls.approval_id` → `approvals.id` (one-to-many)
 - `orders.item_id` → `items.id` (one-to-one)
 - `comments.item_id` → `items.id` (one-to-many, unique per role)
+- `worker_jobs.worker_id` → `workers.id` (many-to-one)
+- `worker_jobs.chantier_name` → `projects.address` (logical relationship via name matching)
 
 ## Common Queries
 
@@ -328,19 +336,165 @@ SELECT * FROM get_items_needing_validation('cray');
 SELECT * FROM get_todo_items('cray');
 ```
 
+### Timeline & Workers Queries
+
+```sql
+-- Get all projects for timeline view
+SELECT * FROM get_all_projects_timeline();
+
+-- Get timeline data for a specific project
+SELECT * FROM get_project_timeline('project-id-here');
+
+-- Get workers assigned to a project
+SELECT * FROM get_project_workers('Alexis Roche Paris Apt');
+
+-- Get all workers with their jobs
+SELECT 
+    w.id,
+    w.name,
+    w.email,
+    w.phone,
+    wj.chantier_name,
+    wj.job_type,
+    wj.start_date,
+    wj.end_date
+FROM workers w
+LEFT JOIN worker_jobs wj ON wj.worker_id = w.id
+ORDER BY w.name, wj.start_date;
+
+-- Get workers with active jobs (current or upcoming)
+SELECT 
+    w.*,
+    wj.*
+FROM workers w
+JOIN worker_jobs wj ON wj.worker_id = w.id
+WHERE wj.end_date >= NOW() 
+  AND wj.start_date <= (NOW() + INTERVAL '90 days')
+ORDER BY wj.start_date;
+```
+
+### 9. Get Workers for Project
+
+```sql
+CREATE OR REPLACE FUNCTION get_project_workers(p_project_address VARCHAR)
+RETURNS TABLE (
+    worker_id VARCHAR,
+    worker_name VARCHAR,
+    worker_email VARCHAR,
+    worker_phone VARCHAR,
+    job_id VARCHAR,
+    chantier_name VARCHAR,
+    job_type VARCHAR,
+    start_date TIMESTAMP,
+    end_date TIMESTAMP
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        w.id,
+        w.name,
+        w.email,
+        w.phone,
+        wj.id as job_id,
+        wj.chantier_name,
+        wj.job_type,
+        wj.start_date,
+        wj.end_date
+    FROM workers w
+    JOIN worker_jobs wj ON wj.worker_id = w.id
+    WHERE UPPER(TRIM(wj.chantier_name)) = UPPER(TRIM(p_project_address))
+       OR UPPER(TRIM(wj.chantier_name)) LIKE '%' || UPPER(TRIM(p_project_address)) || '%'
+       OR UPPER(TRIM(p_project_address)) LIKE '%' || UPPER(TRIM(wj.chantier_name)) || '%'
+    ORDER BY w.name, wj.start_date;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 10. Get Project Timeline
+
+```sql
+CREATE OR REPLACE FUNCTION get_project_timeline(p_project_id VARCHAR)
+RETURNS TABLE (
+    project_id VARCHAR,
+    start_date TIMESTAMP,
+    end_date TIMESTAMP,
+    duration_days INTEGER,
+    status VARCHAR,
+    progress_percentage INTEGER
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id,
+        p.start_date,
+        p.end_date,
+        CASE 
+            WHEN p.start_date IS NOT NULL AND p.end_date IS NOT NULL 
+            THEN EXTRACT(DAY FROM (p.end_date - p.start_date))::INTEGER
+            ELSE NULL
+        END as duration_days,
+        p.status,
+        CASE
+            WHEN p.start_date IS NOT NULL AND p.end_date IS NOT NULL AND NOW() >= p.start_date AND NOW() <= p.end_date
+            THEN ROUND(EXTRACT(DAY FROM (NOW() - p.start_date))::NUMERIC / EXTRACT(DAY FROM (p.end_date - p.start_date))::NUMERIC * 100)::INTEGER
+            WHEN p.end_date IS NOT NULL AND NOW() > p.end_date THEN 100
+            ELSE NULL
+        END as progress_percentage
+    FROM projects p
+    WHERE p.id = p_project_id;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### 11. Get All Projects for Timeline View
+
+```sql
+CREATE OR REPLACE FUNCTION get_all_projects_timeline()
+RETURNS TABLE (
+    project_id VARCHAR,
+    name VARCHAR,
+    address VARCHAR,
+    start_date TIMESTAMP,
+    end_date TIMESTAMP,
+    status VARCHAR,
+    client_name VARCHAR
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id,
+        p.name,
+        p.address,
+        p.start_date,
+        p.end_date,
+        p.status,
+        p.client_name
+    FROM projects p
+    ORDER BY p.start_date ASC NULLS LAST, p.created_at ASC;
+END;
+$$ LANGUAGE plpgsql;
+```
+
 ## Performance Tips
 
 1. **Use Indexes**: All foreign keys and commonly queried fields are indexed
 2. **Use Functions**: SQL functions are pre-compiled and faster than ad-hoc queries
 3. **Limit Results**: Always use LIMIT for large result sets
 4. **Use Transactions**: Wrap multiple operations in transactions for consistency
+5. **Index Date Ranges**: Worker jobs and project dates are indexed for timeline queries
 
 ## Migration Helpers
 
 ### Count Items in Each Table
 
 ```sql
-SELECT 'sections' as table_name, COUNT(*) as count FROM sections
+SELECT 'projects' as table_name, COUNT(*) as count FROM projects
+UNION ALL
+SELECT 'workers', COUNT(*) FROM workers
+UNION ALL
+SELECT 'worker_jobs', COUNT(*) FROM worker_jobs
+UNION ALL
+SELECT 'sections', COUNT(*) FROM sections
 UNION ALL
 SELECT 'items', COUNT(*) FROM items
 UNION ALL
@@ -350,7 +504,9 @@ SELECT 'replacement_urls', COUNT(*) FROM replacement_urls
 UNION ALL
 SELECT 'orders', COUNT(*) FROM orders
 UNION ALL
-SELECT 'comments', COUNT(*) FROM comments;
+SELECT 'comments', COUNT(*) FROM comments
+UNION ALL
+SELECT 'edit_history', COUNT(*) FROM edit_history;
 ```
 
 ### Verify Data Integrity

@@ -3,6 +3,7 @@ import { useTranslation } from '../hooks/useTranslation.js';
 import { useRole } from '../contexts/AppContext.jsx';
 import { useProjects } from '../contexts/ProjectsContext.jsx';
 import WorkersCard from '../components/WorkersCard.jsx';
+import TimelineCard from '../components/TimelineCard.jsx';
 
 function Dashboard() {
   const { data, loading, error, metrics } = useMaterialsData();
@@ -93,6 +94,7 @@ function Dashboard() {
           )}
         </div>
         
+        <TimelineCard />
         <WorkersCard />
       </section>
     </>

@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useProjects } from '../contexts/ProjectsContext.jsx';
+import { validateProjectDates } from '../utils/projectValidation.js';
 
 const ZOOM_MODES = {
   WEEK: 'week',
@@ -765,8 +766,49 @@ function Timeline() {
                     id="edit-start-date"
                     type="date"
                     value={editFormData.startDate || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, startDate: e.target.value })}
+                    onChange={(e) => {
+                      const newStartDate = e.target.value;
+                      setEditFormData({ ...editFormData, startDate: newStartDate });
+                      
+                      // Real-time validation: if endDate exists and is before new startDate, show warning
+                      if (editFormData.endDate && newStartDate) {
+                        const start = new Date(newStartDate);
+                        const end = new Date(editFormData.endDate);
+                        if (start > end) {
+                          // Highlight the input with error style
+                          setTimeout(() => {
+                            const input = document.getElementById('edit-start-date');
+                            if (input) {
+                              input.style.borderColor = '#ef4444';
+                              input.style.backgroundColor = '#fef2f2';
+                            }
+                          }, 0);
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Reset error styling if valid
+                      const validation = validateProjectDates({
+                        startDate: editFormData.startDate,
+                        endDate: editFormData.endDate
+                      });
+                      if (validation.isValid) {
+                        e.target.style.borderColor = '';
+                        e.target.style.backgroundColor = '';
+                      }
+                    }}
                   />
+                  {editFormData.startDate && editFormData.endDate && (() => {
+                    const validation = validateProjectDates({
+                      startDate: editFormData.startDate,
+                      endDate: editFormData.endDate
+                    });
+                    return !validation.isValid ? (
+                      <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                        {validation.errors[0]}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="timeline-edit-field">
                   <label htmlFor="edit-end-date">End Date:</label>
@@ -774,8 +816,48 @@ function Timeline() {
                     id="edit-end-date"
                     type="date"
                     value={editFormData.endDate || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, endDate: e.target.value })}
+                    onChange={(e) => {
+                      const newEndDate = e.target.value;
+                      setEditFormData({ ...editFormData, endDate: newEndDate });
+                      
+                      // Real-time validation: if startDate exists and is after new endDate, show warning
+                      if (editFormData.startDate && newEndDate) {
+                        const start = new Date(editFormData.startDate);
+                        const end = new Date(newEndDate);
+                        if (start > end) {
+                          setTimeout(() => {
+                            const input = document.getElementById('edit-end-date');
+                            if (input) {
+                              input.style.borderColor = '#ef4444';
+                              input.style.backgroundColor = '#fef2f2';
+                            }
+                          }, 0);
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const validation = validateProjectDates({
+                        startDate: editFormData.startDate,
+                        endDate: editFormData.endDate
+                      });
+                      if (validation.isValid) {
+                        e.target.style.borderColor = '';
+                        e.target.style.backgroundColor = '';
+                      }
+                    }}
+                    min={editFormData.startDate || ''}
                   />
+                  {editFormData.startDate && editFormData.endDate && (() => {
+                    const validation = validateProjectDates({
+                      startDate: editFormData.startDate,
+                      endDate: editFormData.endDate
+                    });
+                    return !validation.isValid ? (
+                      <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                        {validation.errors[0]}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -831,12 +913,20 @@ function Timeline() {
                       percentagePaid: editFormData.percentagePaid || 0,
                     };
                     
+                    // Normalize and validate dates
                     if (editFormData.startDate) {
                       updates.startDate = new Date(editFormData.startDate).toISOString();
                     }
                     
                     if (editFormData.endDate) {
                       updates.endDate = new Date(editFormData.endDate).toISOString();
+                    }
+                    
+                    // Validate dates before saving
+                    const validation = validateProjectDates(updates);
+                    if (!validation.isValid) {
+                      alert(`Cannot save: ${validation.errors.join(', ')}`);
+                      return;
                     }
                     
                     updateProject(editingProject.id, updates);

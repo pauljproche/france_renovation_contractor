@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { validateProject, validateProjectDates } from '../utils/projectValidation.js';
 
 const ProjectsContext = createContext(undefined);
 
@@ -359,18 +360,37 @@ export function ProjectsProvider({ children }) {
       status: 'draft', // draft, ready, active, completed, archived
       ...projectData
     };
+    
+    // Validate project before creating
+    const validation = validateProject(newProject);
+    if (!validation.isValid) {
+      console.error('Cannot create project:', validation.errors);
+      throw new Error(`Invalid project data: ${validation.errors.join(', ')}`);
+    }
+    
     setProjects((prev) => [...prev, newProject]);
     return newProject;
   };
 
   const updateProject = (id, updates) => {
-    setProjects((prev) =>
-      prev.map((project) =>
-        project.id === id
-          ? { ...project, ...updates, updatedAt: new Date().toISOString() }
-          : project
-      )
-    );
+    setProjects((prev) => {
+      return prev.map((project) => {
+        if (project.id === id) {
+          const updatedProject = { ...project, ...updates, updatedAt: new Date().toISOString() };
+          
+          // Validate dates before updating (don't throw, just log warnings for existing data)
+          const dateValidation = validateProjectDates(updatedProject);
+          if (!dateValidation.isValid) {
+            console.warn(`Project ${id} has invalid dates:`, dateValidation.errors);
+            // Still allow update, but log the issue
+            // In production, you might want to throw or show user notification
+          }
+          
+          return updatedProject;
+        }
+        return project;
+      });
+    });
   };
 
   const deleteProject = (id) => {

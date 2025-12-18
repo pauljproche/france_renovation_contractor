@@ -209,6 +209,22 @@ export const translations = {
     deleteWorkerConfirm: 'Are you sure you want to delete {name}? This action cannot be undone.',
     deleteWorkerConfirmWithJobs: 'Are you sure you want to delete {name}? This will also delete {count} associated job(s). This action cannot be undone.',
     
+    // Timeline Card
+    projectTimeline: 'Project Timeline',
+    noTimelineData: 'No timeline information available for this project',
+    viewFullTimeline: 'View Full Timeline →',
+    startDate: 'Start Date',
+    endDate: 'End Date',
+    duration: 'Duration',
+    elapsed: 'Elapsed',
+    progress: 'Progress',
+    day: 'day',
+    days: 'days',
+    dayRemaining: 'day remaining',
+    daysRemaining: 'days remaining',
+    upcoming: 'Upcoming',
+    projectStartsIn: 'Project starts in {days} day(s)',
+    
     // Materials
     materialsTitle: 'Materials & Procurement',
     materialsSubtitle: 'Detailed breakdown of the spreadsheet powering the assistant.',
@@ -586,6 +602,22 @@ export const translations = {
     deleteWorker: 'Supprimer l\'Ouvrier',
     deleteWorkerConfirm: 'Êtes-vous sûr de vouloir supprimer {name} ? Cette action est irréversible.',
     deleteWorkerConfirmWithJobs: 'Êtes-vous sûr de vouloir supprimer {name} ? Cela supprimera également {count} tâche(s) associée(s). Cette action est irréversible.',
+    
+    // Timeline Card
+    projectTimeline: 'Chronologie du Projet',
+    noTimelineData: 'Aucune information de chronologie disponible pour ce projet',
+    viewFullTimeline: 'Voir la Chronologie Complète →',
+    startDate: 'Date de Début',
+    endDate: 'Date de Fin',
+    duration: 'Durée',
+    elapsed: 'Écoulé',
+    progress: 'Progression',
+    day: 'jour',
+    days: 'jours',
+    dayRemaining: 'jour restant',
+    daysRemaining: 'jours restants',
+    upcoming: 'À Venir',
+    projectStartsIn: 'Le projet commence dans {days} jour(s)',
     
     // Materials
     materialsTitle: 'Matériaux et Approvisionnement',
