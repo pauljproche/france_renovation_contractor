@@ -80,3 +80,4 @@ sudo systemctl disable france-renovation-bot
 - Verify file permissions allow the user to access all required files
 
 
+
