@@ -32,6 +32,10 @@ engine = create_engine(
     echo=False  # Set to True for SQL query logging in development
 )
 
+# Base class for models (must be before models import)
+from sqlalchemy.orm import declarative_base
+Base = declarative_base()
+
 # Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
