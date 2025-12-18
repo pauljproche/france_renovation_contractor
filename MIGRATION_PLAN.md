@@ -4,6 +4,8 @@
 
 This document outlines the phased migration from JSON file-based storage and localStorage to PostgreSQL database for the France Renovation Contractor application.
 
+**Git Workflow**: This migration is organized into branches following `MIGRATION_BRANCH_STRATEGY.md`. Each phase or logical milestone has its own branch with PRs for review. See the branch strategy document for details.
+
 **Goal**: Migrate from JSON file-based storage (`data/materials.json`, localStorage for projects/workers) to PostgreSQL while maintaining zero downtime and backward compatibility during the transition.
 
 **Primary Goal**: Achieve ACID compliance - all database operations are atomic ("all or nothing"). This ensures data consistency guarantees that JSON/localStorage cannot provide.
@@ -1621,6 +1623,7 @@ const updateProject = async (id, updates) => {
 
 ## Notes
 
+- **Branch Strategy**: See `MIGRATION_BRANCH_STRATEGY.md` for branch organization and PR workflow
 - Each phase should be completed and tested before moving to the next
 - Keep JSON files as backup until Phase 7 is complete
 - Keep localStorage data as backup for projects and workers until Phase 7
