@@ -127,7 +127,7 @@ CREATE TABLE projects (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     address VARCHAR(255),
-    owner_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Primary owner/contractor who created/manages this project
+    owner_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,  -- Primary owner/contractor who created/manages this project (required, prevents orphaned projects)
     status project_status_enum DEFAULT 'draft' NOT NULL,
     devis_status devis_status_enum,  -- NULL allowed (no devis yet)
     invoice_count INTEGER DEFAULT 0 NOT NULL,
@@ -434,8 +434,8 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 -- ============================================================================
 -- 
 -- Authentication & Access:
---   users (1) ──< (0 or N) projects.owner_id (SET NULL on delete)
---   users (1) ──< (0 or N) project_members (many-to-many with role)
+--   users (1) ──< (1 or N) projects.owner_id (RESTRICT on delete - ensures at least one owner per project)
+--   users (1) ──< (0 or N) project_members (many-to-many with role, CASCADE delete)
 --   users (1) ──< (0 or 1) workers.user_id (SET NULL on delete, nullable)
 --   users (1) ──< (0 or N) edit_history.user_id (SET NULL on delete, nullable)
 --   projects (1) ──< (N) project_members (CASCADE delete)
@@ -461,7 +461,8 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 --   - Deleting an approval → deletes replacement_urls
 --   - Deleting a worker → deletes all worker_jobs
 --   - Deleting a user → deletes project_members (CASCADE)
+--   - Deleting a user → RESTRICT if user is owner of any projects (prevents orphaned projects)
 --   - edit_history.item_id → SET NULL (preserves audit trail)
---   - Deleting a user → SET NULL on projects.owner_id, workers.user_id, edit_history.user_id
---     (preserves data, just removes user linkage)
+--   - Deleting a user → SET NULL on workers.user_id, edit_history.user_id
+--     (preserves data, just removes user linkage, but NOT for projects.owner_id - RESTRICT applies)
 -- ============================================================================
