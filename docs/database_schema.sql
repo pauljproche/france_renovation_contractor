@@ -197,13 +197,17 @@ CREATE INDEX idx_project_members_project_role ON project_members(project_id, rol
 -- ============================================================================
 CREATE TABLE workers (
     user_id VARCHAR(50) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,  -- PK = FK to users (one-to-one)
-    -- Worker-specific fields (diplomas, certificates, etc.) can be added here
-    -- For now, this table exists as a placeholder for future worker-specific attributes
+    certificates JSONB,  -- Optional: Array of certificates/diplomas
+    -- Example structure: [
+    --   {"name": "Electrician License", "issuing_org": "French Electric Authority", "date": "2020-01-15", "expires": "2025-01-15"},
+    --   {"name": "Plumbing Certificate", "issuing_org": "Trade School", "date": "2018-06-01", "expires": null}
+    -- ]
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
--- Note: No separate indexes needed - user_id is already indexed as PK
+-- Index for certificates JSONB field (useful for queries filtering by certificate name/type)
+CREATE INDEX idx_workers_certificates ON workers USING GIN (certificates);
 
 
 -- ============================================================================
