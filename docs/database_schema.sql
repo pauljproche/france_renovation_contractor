@@ -247,32 +247,6 @@ CREATE INDEX idx_workers_certificates ON workers USING GIN (certificates);
 
 
 -- ============================================================================
--- WORKER_JOBS (Worker Assignments)
--- ============================================================================
--- Jobs/tasks assigned to workers on specific projects
--- ============================================================================
-CREATE TABLE worker_jobs (
-    id VARCHAR(50) PRIMARY KEY,
-    worker_id VARCHAR(50) NOT NULL REFERENCES workers(user_id) ON DELETE CASCADE,  -- References workers.user_id (which is also users.id)
-    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,  -- Direct FK to project
-    job_type work_type_enum,  -- Type of work assigned (uses work_type_enum)
-    location VARCHAR(255),  -- Optional: Location where work is performed (e.g., "kitchen", "bathroom", "living room")
-    comment TEXT,  -- Optional: Additional notes/comments about the job
-    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    end_date TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
-);
-
--- Indexes for worker_jobs
-CREATE INDEX idx_worker_jobs_worker ON worker_jobs(worker_id);
-CREATE INDEX idx_worker_jobs_project ON worker_jobs(project_id);
-CREATE INDEX idx_worker_jobs_dates ON worker_jobs(start_date, end_date);
-CREATE INDEX idx_worker_jobs_type ON worker_jobs(job_type);
-CREATE INDEX idx_worker_jobs_location ON worker_jobs(location) WHERE location IS NOT NULL;  -- Partial index for location queries
-
-
--- ============================================================================
 -- SECTIONS (Material Categories)
 -- ============================================================================
 -- Groups items by category (e.g., "Cuisine", "Salle de bain")
@@ -468,6 +442,32 @@ CREATE TABLE custom_fields (
 
 -- Indexes for custom_fields
 CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
+
+
+-- ============================================================================
+-- WORKER_JOBS (Worker Assignments)
+-- ============================================================================
+-- Jobs/tasks assigned to workers on specific projects
+-- ============================================================================
+CREATE TABLE worker_jobs (
+    id VARCHAR(50) PRIMARY KEY,
+    worker_id VARCHAR(50) NOT NULL REFERENCES workers(user_id) ON DELETE CASCADE,  -- References workers.user_id (which is also users.id)
+    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,  -- Direct FK to project
+    job_type work_type_enum,  -- Type of work assigned (uses work_type_enum)
+    location VARCHAR(255),  -- Optional: Location where work is performed (e.g., "kitchen", "bathroom", "living room")
+    comment TEXT,  -- Optional: Additional notes/comments about the job
+    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_date TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- Indexes for worker_jobs
+CREATE INDEX idx_worker_jobs_worker ON worker_jobs(worker_id);
+CREATE INDEX idx_worker_jobs_project ON worker_jobs(project_id);
+CREATE INDEX idx_worker_jobs_dates ON worker_jobs(start_date, end_date);
+CREATE INDEX idx_worker_jobs_type ON worker_jobs(job_type);
+CREATE INDEX idx_worker_jobs_location ON worker_jobs(location) WHERE location IS NOT NULL;  -- Partial index for location queries
 
 
 -- ============================================================================
