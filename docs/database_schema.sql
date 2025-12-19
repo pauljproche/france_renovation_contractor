@@ -43,11 +43,8 @@ CREATE TYPE work_type_enum AS ENUM (
     'price_revision'
 );
 
--- Approval role enum: Used in approvals and comments tables
-CREATE TYPE approval_role_enum AS ENUM (
-    'client',
-    'cray'
-);
+-- Approval role: Only 2 values, determined by user login (not directly selected)
+-- Using VARCHAR with CHECK instead of enum for simplicity
 
 -- Project status enum: Lifecycle status of projects
 CREATE TYPE project_status_enum AS ENUM (
@@ -74,11 +71,8 @@ CREATE TYPE approval_status_enum AS ENUM (
     'supplied_by'
 );
 
--- Edit source enum: Source of edit (manual vs agent/AI)
-CREATE TYPE edit_source_enum AS ENUM (
-    'manual',
-    'agent'
-);
+-- Edit source: Only 2 values, internal tracking (users don't select)
+-- Using VARCHAR with CHECK instead of enum for simplicity
 
 -- Delivery status enum: Status of item delivery
 CREATE TYPE delivery_status_enum AS ENUM (
@@ -269,7 +263,7 @@ CREATE INDEX idx_items_labor_type ON items(labor_type);
 CREATE TABLE approvals (
     id SERIAL PRIMARY KEY,
     item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    role approval_role_enum NOT NULL,
+    role VARCHAR(10) NOT NULL CHECK (role IN ('client', 'cray')),
     status approval_status_enum,  -- NULL allowed (no status set yet)
     note TEXT,
     validated_at TIMESTAMP WITH TIME ZONE,
@@ -340,7 +334,7 @@ CREATE INDEX idx_orders_ordered ON orders(ordered);
 CREATE TABLE comments (
     id SERIAL PRIMARY KEY,
     item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    role approval_role_enum NOT NULL,  -- Uses same enum as approvals (client/cray)
+    role VARCHAR(10) NOT NULL CHECK (role IN ('client', 'cray')),
     comment_text TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
@@ -368,7 +362,7 @@ CREATE TABLE edit_history (
     field_path VARCHAR(255) NOT NULL,  -- e.g., 'price_ttc', 'approvals.client.status'
     old_value JSONB,
     new_value JSONB,
-    source edit_source_enum DEFAULT 'manual' NOT NULL,
+    source VARCHAR(10) DEFAULT 'manual' NOT NULL CHECK (source IN ('manual', 'agent')),
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
