@@ -85,7 +85,7 @@ CREATE TYPE delivery_status_enum AS ENUM (
 );
 
 -- ============================================================================
--- USERS (Authentication & Access Control)
+-- USER (Authentication & Access Control)
 -- ============================================================================
 -- Stores user accounts for contractors, clients, and workers
 -- Supports web login and Zulip bot integration
@@ -97,7 +97,7 @@ CREATE TYPE user_role_enum AS ENUM (
     'subcontractor'
 );
 
-CREATE TABLE users (
+CREATE TABLE user (
     id VARCHAR(50) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255),  -- Nullable if using OAuth only
@@ -108,27 +108,27 @@ CREATE TABLE users (
     last_login TIMESTAMP WITH TIME ZONE,
     
     -- Constraints
-    CONSTRAINT users_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
-    CONSTRAINT users_email_valid CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+    CONSTRAINT user_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT user_email_valid CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
 );
 
--- Indexes for users
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_users_zulip_user_id ON users(zulip_user_id) WHERE zulip_user_id IS NOT NULL;
+-- Indexes for user
+CREATE INDEX idx_user_email ON "user"(email);
+CREATE INDEX idx_user_role ON "user"(role);
+CREATE INDEX idx_user_zulip_user_id ON "user"(zulip_user_id) WHERE zulip_user_id IS NOT NULL;
 
 
 -- ============================================================================
--- PROJECTS (Core Entity)
+-- PROJECT (Core Entity)
 -- ============================================================================
 -- Stores renovation projects/chantiers
 -- Note: Demo projects remain hardcoded in frontend, not stored in DB
 -- ============================================================================
-CREATE TABLE projects (
+CREATE TABLE project (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     address VARCHAR(255),
-    owner_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,  -- Primary owner/contractor who created/manages this project (required, prevents orphaned projects)
+    owner_id VARCHAR(50) NOT NULL REFERENCES "user"(id) ON DELETE RESTRICT,  -- Primary owner/contractor who created/manages this project (required, prevents orphaned projects)
     status project_status_enum DEFAULT 'draft' NOT NULL,
     invoice_count INTEGER DEFAULT 0 NOT NULL,
     percentage_paid INTEGER DEFAULT 0 NOT NULL,
@@ -140,24 +140,24 @@ CREATE TABLE projects (
     has_data BOOLEAN DEFAULT FALSE NOT NULL,
     
     -- Constraints
-    CONSTRAINT projects_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
-    CONSTRAINT projects_name_length CHECK (LENGTH(name) > 0 AND LENGTH(name) <= 255),
-    CONSTRAINT projects_date_range_valid CHECK (
+    CONSTRAINT project_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT project_name_length CHECK (LENGTH(name) > 0 AND LENGTH(name) <= 255),
+    CONSTRAINT project_date_range_valid CHECK (
         start_date IS NULL OR end_date IS NULL OR start_date <= end_date
     ),
-    CONSTRAINT projects_invoice_count_valid CHECK (invoice_count >= 0),
-    CONSTRAINT projects_percentage_paid_valid CHECK (percentage_paid >= 0 AND percentage_paid <= 100)
+    CONSTRAINT project_invoice_count_valid CHECK (invoice_count >= 0),
+    CONSTRAINT project_percentage_paid_valid CHECK (percentage_paid >= 0 AND percentage_paid <= 100)
 );
 
--- Indexes for projects
-CREATE INDEX idx_projects_status ON projects(status);
-CREATE INDEX idx_projects_created ON projects(created_at DESC);
-CREATE INDEX idx_projects_dates ON projects(start_date, end_date) WHERE start_date IS NOT NULL;
-CREATE INDEX idx_projects_owner ON projects(owner_id) WHERE owner_id IS NOT NULL;
+-- Indexes for project
+CREATE INDEX idx_project_status ON project(status);
+CREATE INDEX idx_project_created ON project(created_at DESC);
+CREATE INDEX idx_project_dates ON project(start_date, end_date) WHERE start_date IS NOT NULL;
+CREATE INDEX idx_project_owner ON project(owner_id) WHERE owner_id IS NOT NULL;
 
 
 -- ============================================================================
--- PROJECT_MEMBERS (User-Project Memberships)
+-- PROJECT_MEMBER (User-Project Memberships)
 -- ============================================================================
 -- Many-to-many relationship: Users can be members of multiple projects
 -- with different roles per project (contractor, client, architect, etc.)
@@ -170,34 +170,34 @@ CREATE TYPE project_member_role_enum AS ENUM (
     'subcontractor'
 );
 
-CREATE TABLE project_members (
+CREATE TABLE project_member (
     id SERIAL PRIMARY KEY,
-    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    user_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    project_id VARCHAR(50) NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    user_id VARCHAR(50) NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
     role project_member_role_enum NOT NULL,  -- Role on THIS project
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
-    CONSTRAINT uq_project_members_project_user UNIQUE(project_id, user_id)  -- One role per user per project
+    CONSTRAINT uq_project_member_project_user UNIQUE(project_id, user_id)  -- One role per user per project
 );
 
--- Indexes for project_members
-CREATE INDEX idx_project_members_project ON project_members(project_id);
-CREATE INDEX idx_project_members_user ON project_members(user_id);
-CREATE INDEX idx_project_members_role ON project_members(role);
-CREATE INDEX idx_project_members_project_role ON project_members(project_id, role);  -- For queries like "all contractors on project X"
+-- Indexes for project_member
+CREATE INDEX idx_project_member_project ON project_member(project_id);
+CREATE INDEX idx_project_member_user ON project_member(user_id);
+CREATE INDEX idx_project_member_role ON project_member(role);
+CREATE INDEX idx_project_member_project_role ON project_member(project_id, role);  -- For queries like "all contractors on project X"
 
 
 -- ============================================================================
--- QUOTES (Project Quotes/Devis)
+-- QUOTE (Project Quotes/Devis)
 -- ============================================================================
 -- Stores quotes (devis) sent to clients for projects
 -- Multiple quotes per project supported (for revisions, updates, etc.)
 -- Initial quote is the itemized estimate/quote sent to client for approval
 -- ============================================================================
-CREATE TABLE quotes (
+CREATE TABLE quote (
     id VARCHAR(50) PRIMARY KEY,
-    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    project_id VARCHAR(50) NOT NULL REFERENCES project(id) ON DELETE CASCADE,
     status quote_status_enum DEFAULT 'draft' NOT NULL,
     version_number INTEGER DEFAULT 1 NOT NULL,  -- Version number for multiple quotes (1, 2, 3, etc.)
     sent_at TIMESTAMP WITH TIME ZONE,  -- When quote was sent to client
@@ -208,31 +208,31 @@ CREATE TABLE quotes (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
-    CONSTRAINT quotes_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
-    CONSTRAINT quotes_version_positive CHECK (version_number > 0),
-    CONSTRAINT quotes_status_dates_consistent CHECK (
+    CONSTRAINT quote_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT quote_version_positive CHECK (version_number > 0),
+    CONSTRAINT quote_status_dates_consistent CHECK (
         (status = 'draft' AND sent_at IS NULL) OR
         (status IN ('sent', 'approved', 'rejected', 'superseded') AND sent_at IS NOT NULL) OR
         (status = 'draft')
     )
 );
 
--- Indexes for quotes
-CREATE INDEX idx_quotes_project ON quotes(project_id);
-CREATE INDEX idx_quotes_status ON quotes(status);
-CREATE INDEX idx_quotes_project_status ON quotes(project_id, status);  -- For finding active quotes per project
-CREATE INDEX idx_quotes_created ON quotes(created_at DESC);
+-- Indexes for quote
+CREATE INDEX idx_quote_project ON quote(project_id);
+CREATE INDEX idx_quote_status ON quote(status);
+CREATE INDEX idx_quote_project_status ON quote(project_id, status);  -- For finding active quotes per project
+CREATE INDEX idx_quote_created ON quote(created_at DESC);
 
 
 -- ============================================================================
--- WORKERS (Worker-Specific Information)
+-- WORKER (Worker-Specific Information)
 -- ============================================================================
 -- Stores worker-specific information (diplomas, certificates, etc.)
 -- One-to-one relationship with users: a worker IS a user with additional worker data
--- Note: Basic info (name, email) comes from users table
+-- Note: Basic info (name, email) comes from user table
 -- ============================================================================
-CREATE TABLE workers (
-    user_id VARCHAR(50) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,  -- PK = FK to users (one-to-one)
+CREATE TABLE worker (
+    user_id VARCHAR(50) PRIMARY KEY REFERENCES "user"(id) ON DELETE CASCADE,  -- PK = FK to user (one-to-one)
     certificates JSONB,  -- Optional: Array of certificates/diplomas
     -- Example structure: [
     --   {"name": "Electrician License", "issuing_org": "French Electric Authority", "date": "2020-01-15", "expires": "2025-01-15"},
@@ -243,18 +243,18 @@ CREATE TABLE workers (
 );
 
 -- Index for certificates JSONB field (useful for queries filtering by certificate name/type)
-CREATE INDEX idx_workers_certificates ON workers USING GIN (certificates);
+CREATE INDEX idx_worker_certificates ON worker USING GIN (certificates);
 
 
 -- ============================================================================
--- WORKER_JOBS (Worker Assignments)
+-- WORKER_JOB (Worker Assignments)
 -- ============================================================================
 -- Jobs/tasks assigned to workers on specific projects
 -- ============================================================================
-CREATE TABLE worker_jobs (
+CREATE TABLE worker_job (
     id VARCHAR(50) PRIMARY KEY,
-    worker_id VARCHAR(50) NOT NULL REFERENCES workers(user_id) ON DELETE CASCADE,  -- References workers.user_id (which is also users.id)
-    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,  -- Direct FK to project
+    worker_id VARCHAR(50) NOT NULL REFERENCES worker(user_id) ON DELETE CASCADE,  -- References worker.user_id (which is also user.id)
+    project_id VARCHAR(50) NOT NULL REFERENCES project(id) ON DELETE CASCADE,  -- Direct FK to project
     job_type work_type_enum,  -- Type of work assigned (uses work_type_enum)
     location VARCHAR(255),  -- Optional: Location where work is performed (e.g., "kitchen", "bathroom", "living room")
     comment TEXT,  -- Optional: Additional notes/comments about the job
@@ -264,44 +264,44 @@ CREATE TABLE worker_jobs (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
--- Indexes for worker_jobs
-CREATE INDEX idx_worker_jobs_worker ON worker_jobs(worker_id);
-CREATE INDEX idx_worker_jobs_project ON worker_jobs(project_id);
-CREATE INDEX idx_worker_jobs_dates ON worker_jobs(start_date, end_date);
-CREATE INDEX idx_worker_jobs_type ON worker_jobs(job_type);
-CREATE INDEX idx_worker_jobs_location ON worker_jobs(location) WHERE location IS NOT NULL;  -- Partial index for location queries
+-- Indexes for worker_job
+CREATE INDEX idx_worker_job_worker ON worker_job(worker_id);
+CREATE INDEX idx_worker_job_project ON worker_job(project_id);
+CREATE INDEX idx_worker_job_dates ON worker_job(start_date, end_date);
+CREATE INDEX idx_worker_job_type ON worker_job(job_type);
+CREATE INDEX idx_worker_job_location ON worker_job(location) WHERE location IS NOT NULL;  -- Partial index for location queries
 
 
 -- ============================================================================
--- SECTIONS (Material Categories)
+-- SECTION (Material Categories)
 -- ============================================================================
 -- Groups items by category (e.g., "Cuisine", "Salle de bain")
 -- Linked to projects
 -- ============================================================================
-CREATE TABLE sections (
+CREATE TABLE section (
     id VARCHAR(50) PRIMARY KEY,
     label VARCHAR(255) NOT NULL,
-    project_id VARCHAR(50) REFERENCES projects(id) ON DELETE CASCADE,
+    project_id VARCHAR(50) REFERENCES project(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
-    CONSTRAINT sections_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
-    CONSTRAINT sections_label_length CHECK (LENGTH(label) > 0 AND LENGTH(label) <= 255)
+    CONSTRAINT section_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT section_label_length CHECK (LENGTH(label) > 0 AND LENGTH(label) <= 255)
 );
 
--- Indexes for sections
-CREATE INDEX idx_sections_project ON sections(project_id);
+-- Indexes for section
+CREATE INDEX idx_section_project ON section(project_id);
 
 
 -- ============================================================================
--- ITEMS (Materials/Products)
+-- ITEM (Materials/Products)
 -- ============================================================================
 -- Individual products/materials in each section
 -- ============================================================================
-CREATE TABLE items (
+CREATE TABLE item (
     id SERIAL PRIMARY KEY,
-    section_id VARCHAR(50) NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+    section_id VARCHAR(50) NOT NULL REFERENCES section(id) ON DELETE CASCADE,
     product TEXT NOT NULL,
     reference VARCHAR(255),
     supplier_link TEXT,
@@ -312,27 +312,27 @@ CREATE TABLE items (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
-    CONSTRAINT items_product_not_empty CHECK (LENGTH(TRIM(product)) > 0),
-    CONSTRAINT items_price_ttc_valid CHECK (price_ttc IS NULL OR price_ttc >= 0),
-    CONSTRAINT items_price_ht_valid CHECK (price_ht_quote IS NULL OR price_ht_quote >= 0),
-    CONSTRAINT uq_items_section_product UNIQUE(section_id, product)  -- Prevent duplicates
+    CONSTRAINT item_product_not_empty CHECK (LENGTH(TRIM(product)) > 0),
+    CONSTRAINT item_price_ttc_valid CHECK (price_ttc IS NULL OR price_ttc >= 0),
+    CONSTRAINT item_price_ht_valid CHECK (price_ht_quote IS NULL OR price_ht_quote >= 0),
+    CONSTRAINT uq_item_section_product UNIQUE(section_id, product)  -- Prevent duplicates
 );
 
--- Indexes for items
-CREATE INDEX idx_items_section ON items(section_id);
-CREATE INDEX idx_items_product ON items(product);
-CREATE INDEX idx_items_updated ON items(updated_at DESC);
-CREATE INDEX idx_items_labor_type ON items(labor_type);
+-- Indexes for item
+CREATE INDEX idx_item_section ON item(section_id);
+CREATE INDEX idx_item_product ON item(product);
+CREATE INDEX idx_item_updated ON item(updated_at DESC);
+CREATE INDEX idx_item_labor_type ON item(labor_type);
 
 
 -- ============================================================================
--- APPROVALS (Approval Tracking)
+-- APPROVAL (Approval Tracking)
 -- ============================================================================
 -- Tracks approval status by role (client/cray) for each item
 -- ============================================================================
-CREATE TABLE approvals (
+CREATE TABLE approval (
     id SERIAL PRIMARY KEY,
-    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    item_id INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE,
     role VARCHAR(10) NOT NULL CHECK (role IN ('client', 'cray')),
     status approval_status_enum,  -- NULL allowed (no status set yet)
     note TEXT,
@@ -341,40 +341,40 @@ CREATE TABLE approvals (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
-    CONSTRAINT uq_approvals_item_role UNIQUE(item_id, role)  -- One approval per role per item
+    CONSTRAINT uq_approval_item_role UNIQUE(item_id, role)  -- One approval per role per item
 );
 
--- Indexes for approvals
-CREATE INDEX idx_approvals_item ON approvals(item_id);
-CREATE INDEX idx_approvals_item_role ON approvals(item_id, role);  -- Composite for common query
-CREATE INDEX idx_approvals_status ON approvals(status) WHERE status IS NOT NULL;
+-- Indexes for approval
+CREATE INDEX idx_approval_item ON approval(item_id);
+CREATE INDEX idx_approval_item_role ON approval(item_id, role);  -- Composite for common query
+CREATE INDEX idx_approval_status ON approval(status) WHERE status IS NOT NULL;
 
 
 -- ============================================================================
--- REPLACEMENT_URLS (Replacement URLs Array)
+-- REPLACEMENT_URL (Replacement URLs Array)
 -- ============================================================================
 -- Stores array of replacement URLs for approvals
 -- Normalized: One row per URL (array converted to separate table)
 -- ============================================================================
-CREATE TABLE replacement_urls (
+CREATE TABLE replacement_url (
     id SERIAL PRIMARY KEY,
-    approval_id INTEGER NOT NULL REFERENCES approvals(id) ON DELETE CASCADE,
+    approval_id INTEGER NOT NULL REFERENCES approval(id) ON DELETE CASCADE,
     url TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
--- Indexes for replacement_urls
-CREATE INDEX idx_replacement_urls_approval ON replacement_urls(approval_id);
+-- Indexes for replacement_url
+CREATE INDEX idx_replacement_url_approval ON replacement_url(approval_id);
 
 
 -- ============================================================================
--- ORDERS (Order Tracking)
+-- ORDER (Order Tracking)
 -- ============================================================================
 -- Tracks ordering and delivery information for items
 -- ============================================================================
-CREATE TABLE orders (
+CREATE TABLE "order" (
     id SERIAL PRIMARY KEY,
-    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE UNIQUE,  -- One order per item
+    item_id INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE UNIQUE,  -- One order per item
     ordered BOOLEAN DEFAULT FALSE NOT NULL,
     order_date VARCHAR(10),  -- Format: 'dd/mm' (kept as VARCHAR for frontend compatibility)
     delivery_date VARCHAR(10),  -- Format: 'dd/mm' (kept as VARCHAR for frontend compatibility)
@@ -384,52 +384,53 @@ CREATE TABLE orders (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
-    CONSTRAINT orders_quantity_valid CHECK (quantity IS NULL OR quantity > 0),
-    CONSTRAINT orders_ordered_with_date CHECK (
+    CONSTRAINT order_quantity_valid CHECK (quantity IS NULL OR quantity > 0),
+    CONSTRAINT order_ordered_with_date CHECK (
         (ordered = FALSE AND order_date IS NULL) OR 
         (ordered = TRUE AND order_date IS NOT NULL)
     ),  -- If ordered=true, order_date must be set
-    CONSTRAINT orders_date_format CHECK (
+    CONSTRAINT order_date_format CHECK (
         (order_date IS NULL OR order_date ~ '^\d{2}/\d{2}$') AND
         (delivery_date IS NULL OR delivery_date ~ '^\d{2}/\d{2}$')
     )
 );
 
--- Indexes for orders
-CREATE INDEX idx_orders_item ON orders(item_id);
-CREATE INDEX idx_orders_ordered ON orders(ordered);
+-- Indexes for order
+CREATE INDEX idx_order_item ON "order"(item_id);
+CREATE INDEX idx_order_ordered ON "order"(ordered);
 
 
 -- ============================================================================
--- COMMENTS (Comments by Role)
+-- COMMENT (Comments by Role)
 -- ============================================================================
 -- Stores comments by role (client/cray) for each item
 -- ============================================================================
-CREATE TABLE comments (
+CREATE TABLE comment (
     id SERIAL PRIMARY KEY,
-    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    item_id INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE,
     role VARCHAR(10) NOT NULL CHECK (role IN ('client', 'cray')),
     comment_text TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
-    CONSTRAINT uq_comments_item_role UNIQUE(item_id, role)
+    CONSTRAINT uq_comment_item_role UNIQUE(item_id, role)
 );
 
--- Indexes for comments
-CREATE INDEX idx_comments_item ON comments(item_id);
+-- Indexes for comment
+CREATE INDEX idx_comment_item ON comment(item_id);
 
 
 -- ============================================================================
 -- EDIT_HISTORY (Audit Trail)
 -- ============================================================================
 -- Tracks all changes to items for audit purposes
+-- Note: "history" is already singular (the concept, not "histories")
 -- ============================================================================
 CREATE TABLE edit_history (
     id SERIAL PRIMARY KEY,
-    item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,  -- Keep history even if item deleted
-    user_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- User who made the change (for audit trail)
+    item_id INTEGER REFERENCES item(id) ON DELETE SET NULL,  -- Keep history even if item deleted
+    user_id VARCHAR(50) REFERENCES "user"(id) ON DELETE SET NULL,  -- User who made the change (for audit trail)
     section_id VARCHAR(50),
     section_label VARCHAR(255),
     product TEXT,
@@ -450,24 +451,24 @@ CREATE INDEX idx_edit_history_user ON edit_history(user_id) WHERE user_id IS NOT
 
 
 -- ============================================================================
--- CUSTOM_FIELDS (Extensible Fields)
+-- CUSTOM_FIELD (Extensible Fields)
 -- ============================================================================
 -- Allows extending items with custom fields dynamically
 -- ============================================================================
-CREATE TABLE custom_fields (
+CREATE TABLE custom_field (
     id SERIAL PRIMARY KEY,
-    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    item_id INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE,
     field_name VARCHAR(100) NOT NULL,
     field_value JSONB,  -- Flexible value storage
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
-    CONSTRAINT uq_custom_fields_item_field UNIQUE(item_id, field_name)
+    CONSTRAINT uq_custom_field_item_field UNIQUE(item_id, field_name)
 );
 
--- Indexes for custom_fields
-CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
+-- Indexes for custom_field
+CREATE INDEX idx_custom_field_item ON custom_field(item_id);
 
 
 -- ============================================================================
@@ -475,38 +476,38 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 -- ============================================================================
 -- 
 -- Authentication & Access:
---   users (1) ──< (1 or N) projects.owner_id (RESTRICT on delete - ensures at least one owner per project)
---   users (1) ──< (0 or N) project_members (many-to-many with role, CASCADE delete)
---   users (1) ──< (0 or 1) workers (one-to-one, workers.user_id = PK = FK to users.id, CASCADE delete)
---   users (1) ──< (0 or N) edit_history.user_id (SET NULL on delete, nullable)
---   projects (1) ──< (N) project_members (CASCADE delete)
+--   user (1) ──< (1 or N) project.owner_id (RESTRICT on delete - ensures at least one owner per project)
+--   user (1) ──< (0 or N) project_member (many-to-many with role, CASCADE delete)
+--   user (1) ──< (0 or 1) worker (one-to-one, worker.user_id = PK = FK to user.id, CASCADE delete)
+--   user (1) ──< (0 or N) edit_history.user_id (SET NULL on delete, nullable)
+--   project (1) ──< (N) project_member (CASCADE delete)
 -- 
 -- Core Hierarchy:
---   projects (1) ──< (N) quotes (multiple quotes per project, versioned)
---   projects (1) ──< (N) sections (1) ──< (N) items
+--   project (1) ──< (N) quote (multiple quotes per project, versioned)
+--   project (1) ──< (N) section (1) ──< (N) item
 --   
--- Items Relationships:
---   items (1) ──< (N) approvals (1) ──< (N) replacement_urls
---   items (1) ──< (1) orders
---   items (1) ──< (N) comments
---   items (1) ──< (N) custom_fields
---   items (1) ──< (N) edit_history
+-- Item Relationships:
+--   item (1) ──< (N) approval (1) ──< (N) replacement_url
+--   item (1) ──< (1) order
+--   item (1) ──< (N) comment
+--   item (1) ──< (N) custom_field
+--   item (1) ──< (N) edit_history
 --   
 -- Workers:
---   workers (1) ──< (N) worker_jobs
---   projects (1) ──< (N) worker_jobs (direct FK)
+--   worker (1) ──< (N) worker_job
+--   project (1) ──< (N) worker_job (direct FK)
 -- 
 -- CASCADE Rules:
 --   - Deleting a project → deletes all quotes (CASCADE)
 --   - Deleting a project → deletes all sections → deletes all items → cascades through
---   - Deleting a project → deletes project_members (CASCADE)
+--   - Deleting a project → deletes project_member (CASCADE)
 --   - Deleting an item → deletes approvals, orders, comments, custom_fields
 --   - Deleting an approval → deletes replacement_urls
---   - Deleting a worker (user) → deletes workers row (CASCADE) → deletes all worker_jobs (CASCADE)
---   - Deleting a user → deletes project_members (CASCADE)
---   - Deleting a user → deletes workers row if user is a worker (CASCADE)
+--   - Deleting a worker (user) → deletes worker row (CASCADE) → deletes all worker_job (CASCADE)
+--   - Deleting a user → deletes project_member (CASCADE)
+--   - Deleting a user → deletes worker row if user is a worker (CASCADE)
 --   - Deleting a user → RESTRICT if user is owner of any projects (prevents orphaned projects)
 --   - edit_history.item_id → SET NULL (preserves audit trail)
 --   - Deleting a user → SET NULL on edit_history.user_id (preserves audit trail, just removes user linkage)
---     (but NOT for projects.owner_id - RESTRICT applies, NOT for workers - CASCADE applies)
+--     (but NOT for project.owner_id - RESTRICT applies, NOT for worker - CASCADE applies)
 -- ============================================================================
