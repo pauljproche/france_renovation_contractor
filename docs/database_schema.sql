@@ -146,13 +146,12 @@ CREATE INDEX idx_workers_user ON workers(user_id) WHERE user_id IS NOT NULL;
 -- ============================================================================
 -- WORKER_JOBS (Worker Assignments)
 -- ============================================================================
--- Jobs/tasks assigned to workers
--- chantier_name logically links to projects.address
+-- Jobs/tasks assigned to workers on specific projects
 -- ============================================================================
 CREATE TABLE worker_jobs (
     id VARCHAR(50) PRIMARY KEY,
     worker_id VARCHAR(50) NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
-    chantier_name VARCHAR(255) NOT NULL,  -- References project address/name
+    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,  -- Direct FK to project
     job_type work_type_enum,  -- Type of work assigned (uses work_type_enum)
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
     end_date TIMESTAMP WITH TIME ZONE,
@@ -162,7 +161,7 @@ CREATE TABLE worker_jobs (
 
 -- Indexes for worker_jobs
 CREATE INDEX idx_worker_jobs_worker ON worker_jobs(worker_id);
-CREATE INDEX idx_worker_jobs_chantier ON worker_jobs(chantier_name);
+CREATE INDEX idx_worker_jobs_project ON worker_jobs(project_id);
 CREATE INDEX idx_worker_jobs_dates ON worker_jobs(start_date, end_date);
 CREATE INDEX idx_worker_jobs_type ON worker_jobs(job_type);
 
@@ -388,7 +387,7 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 --   
 -- Workers:
 --   workers (1) ──< (N) worker_jobs
---   worker_jobs.chantier_name → projects.address (logical link)
+--   projects (1) ──< (N) worker_jobs (direct FK)
 -- 
 -- CASCADE Rules:
 --   - Deleting a project → deletes all sections → deletes all items → cascades through
