@@ -37,6 +37,35 @@ def upgrade() -> None:
     op.create_index('idx_users_email', 'users', ['email'], unique=False)
     op.create_index('idx_users_role', 'users', ['role'], unique=False)
     op.create_index('idx_users_zulip_user_id', 'users', ['zulip_user_id'], unique=False)
+    
+    # Create projects table (needed before project_members and quotes)
+    op.create_table('projects',
+    sa.Column('id', sa.String(length=50), nullable=False),
+    sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('address', sa.String(length=255), nullable=True),
+    sa.Column('owner_id', sa.String(length=50), nullable=False),
+    sa.Column('status', postgresql.ENUM('DRAFT', 'READY', 'ACTIVE', 'COMPLETED', 'ARCHIVED', name='project_status_enum'), nullable=False),
+    sa.Column('invoice_count', sa.Integer(), nullable=False),
+    sa.Column('percentage_paid', sa.Integer(), nullable=False),
+    sa.Column('start_date', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('end_date', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('is_demo', sa.Boolean(), nullable=False),
+    sa.Column('has_data', sa.Boolean(), nullable=False),
+    sa.CheckConstraint('LENGTH(id) > 0 AND LENGTH(id) <= 50', name='projects_id_length'),
+    sa.CheckConstraint('LENGTH(name) > 0 AND LENGTH(name) <= 255', name='projects_name_length'),
+    sa.CheckConstraint('start_date IS NULL OR end_date IS NULL OR start_date <= end_date', name='projects_date_range_valid'),
+    sa.CheckConstraint('invoice_count >= 0', name='projects_invoice_count_valid'),
+    sa.CheckConstraint('percentage_paid >= 0 AND percentage_paid <= 100', name='projects_percentage_paid_valid'),
+    sa.ForeignKeyConstraint(['owner_id'], ['users.id'], ondelete='RESTRICT'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_projects_status', 'projects', ['status'], unique=False)
+    op.create_index('idx_projects_created', 'projects', ['created_at'], unique=False)
+    op.create_index('idx_projects_dates', 'projects', ['start_date', 'end_date'], unique=False)
+    op.create_index('idx_projects_owner', 'projects', ['owner_id'], unique=False)
+    
     op.create_table('project_members',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('project_id', sa.String(length=50), nullable=False),
@@ -72,67 +101,180 @@ def upgrade() -> None:
     op.create_index('idx_quotes_project', 'quotes', ['project_id'], unique=False)
     op.create_index('idx_quotes_project_status', 'quotes', ['project_id', 'status'], unique=False)
     op.create_index('idx_quotes_status', 'quotes', ['status'], unique=False)
-    op.alter_column('approvals', 'role',
-               existing_type=sa.VARCHAR(length=50),
-               type_=sa.String(length=20),
-               existing_nullable=False)
-    op.alter_column('approvals', 'status',
-               existing_type=sa.VARCHAR(length=50),
-               type_=postgresql.ENUM('APPROVED', 'REJECTED', 'CHANGE_ORDER', 'PENDING', 'SUPPLIED_BY', name='approval_status_enum'),
-               existing_nullable=True)
-    op.alter_column('comments', 'role',
-               existing_type=sa.VARCHAR(length=50),
-               type_=sa.String(length=20),
-               existing_nullable=False)
-    op.add_column('edit_history', sa.Column('user_id', sa.String(length=50), nullable=True))
-    op.alter_column('edit_history', 'source',
-               existing_type=sa.VARCHAR(length=50),
-               type_=sa.String(length=10),
-               existing_nullable=False)
-    op.create_index('idx_edit_history_user', 'edit_history', ['user_id'], unique=False)
-    op.create_foreign_key(None, 'edit_history', 'users', ['user_id'], ['id'], ondelete='SET NULL')
-    op.alter_column('items', 'labor_type',
-               existing_type=sa.VARCHAR(length=50),
-               type_=postgresql.ENUM('DEMOLITION', 'STRUCTURAL', 'FACADE', 'EXTERIOR_JOINERY', 'PLASTERING', 'PLUMBING', 'ELECTRICAL', 'WALL_COVERING', 'INTERIOR_JOINERY', 'LANDSCAPING', 'PRICE_REVISION', name='work_type_enum'),
-               existing_nullable=True)
+    
+    # Create workers table (user_id as PK)
+    op.create_table('workers',
+    sa.Column('user_id', sa.String(length=50), nullable=False),
+    sa.Column('certificates', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('user_id')
+    )
+    op.create_index('idx_workers_certificates', 'workers', ['certificates'], unique=False, postgresql_using='gin')
+    
+    # Create sections table
+    op.create_table('sections',
+    sa.Column('id', sa.String(length=50), nullable=False),
+    sa.Column('label', sa.String(length=255), nullable=False),
+    sa.Column('project_id', sa.String(length=50), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.CheckConstraint('LENGTH(id) > 0 AND LENGTH(id) <= 50', name='sections_id_length'),
+    sa.CheckConstraint('LENGTH(label) > 0 AND LENGTH(label) <= 255', name='sections_label_length'),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_sections_project', 'sections', ['project_id'], unique=False)
+    
+    # Create items table
+    op.create_table('items',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('section_id', sa.String(length=50), nullable=False),
+    sa.Column('product', sa.Text(), nullable=False),
+    sa.Column('reference', sa.String(length=255), nullable=True),
+    sa.Column('supplier_link', sa.Text(), nullable=True),
+    sa.Column('labor_type', postgresql.ENUM('DEMOLITION', 'STRUCTURAL', 'FACADE', 'EXTERIOR_JOINERY', 'PLASTERING', 'PLUMBING', 'ELECTRICAL', 'WALL_COVERING', 'INTERIOR_JOINERY', 'LANDSCAPING', 'PRICE_REVISION', name='work_type_enum'), nullable=True),
+    sa.Column('price_ttc', sa.Numeric(10, 2), nullable=True),
+    sa.Column('price_ht_quote', sa.Numeric(10, 2), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.CheckConstraint('LENGTH(TRIM(product)) > 0', name='items_product_not_empty'),
+    sa.CheckConstraint('price_ht_quote IS NULL OR price_ht_quote >= 0', name='items_price_ht_valid'),
+    sa.CheckConstraint('price_ttc IS NULL OR price_ttc >= 0', name='items_price_ttc_valid'),
+    sa.ForeignKeyConstraint(['section_id'], ['sections.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('section_id', 'product', name='uq_items_section_product')
+    )
     op.create_index('idx_items_labor_type', 'items', ['labor_type'], unique=False)
-    op.alter_column('orders', 'delivery_status',
-               existing_type=sa.VARCHAR(length=50),
-               type_=postgresql.ENUM('PENDING', 'ORDERED', 'SHIPPED', 'DELIVERED', 'CANCELLED', name='delivery_status_enum'),
-               existing_nullable=True)
-    op.add_column('projects', sa.Column('owner_id', sa.String(length=50), nullable=False))
-    op.alter_column('projects', 'status',
-               existing_type=sa.VARCHAR(length=50),
-               type_=postgresql.ENUM('DRAFT', 'READY', 'ACTIVE', 'COMPLETED', 'ARCHIVED', name='project_status_enum'),
-               existing_nullable=False)
-    op.create_index('idx_projects_owner', 'projects', ['owner_id'], unique=False)
-    op.create_foreign_key(None, 'projects', 'users', ['owner_id'], ['id'], ondelete='RESTRICT')
-    op.drop_column('projects', 'client_name')
-    op.drop_column('projects', 'devis_status')
-    op.add_column('worker_jobs', sa.Column('project_id', sa.String(length=50), nullable=False))
-    op.add_column('worker_jobs', sa.Column('location', sa.String(length=255), nullable=True))
-    op.add_column('worker_jobs', sa.Column('comment', sa.Text(), nullable=True))
-    op.alter_column('worker_jobs', 'job_type',
-               existing_type=sa.VARCHAR(length=50),
-               type_=postgresql.ENUM('DEMOLITION', 'STRUCTURAL', 'FACADE', 'EXTERIOR_JOINERY', 'PLASTERING', 'PLUMBING', 'ELECTRICAL', 'WALL_COVERING', 'INTERIOR_JOINERY', 'LANDSCAPING', 'PRICE_REVISION', name='work_type_enum'),
-               existing_nullable=True)
-    op.drop_index('idx_worker_jobs_chantier', table_name='worker_jobs')
+    op.create_index('idx_items_product', 'items', ['product'], unique=False)
+    op.create_index('idx_items_section', 'items', ['section_id'], unique=False)
+    op.create_index('idx_items_updated', 'items', ['updated_at'], unique=False)
+    
+    # Create approvals table
+    op.create_table('approvals',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('item_id', sa.Integer(), nullable=False),
+    sa.Column('role', sa.String(length=20), nullable=False),
+    sa.Column('status', postgresql.ENUM('APPROVED', 'REJECTED', 'CHANGE_ORDER', 'PENDING', 'SUPPLIED_BY', name='approval_status_enum'), nullable=True),
+    sa.Column('note', sa.Text(), nullable=True),
+    sa.Column('validated_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.CheckConstraint("role IN ('client', 'contractor')", name='approvals_role_valid'),
+    sa.ForeignKeyConstraint(['item_id'], ['items.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('item_id', 'role', name='uq_approvals_item_role')
+    )
+    op.create_index('idx_approvals_item', 'approvals', ['item_id'], unique=False)
+    op.create_index('idx_approvals_item_role', 'approvals', ['item_id', 'role'], unique=False)
+    op.create_index('idx_approvals_status', 'approvals', ['status'], unique=False)
+    
+    # Create replacement_urls table
+    op.create_table('replacement_urls',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('approval_id', sa.Integer(), nullable=False),
+    sa.Column('url', sa.Text(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['approval_id'], ['approvals.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_replacement_urls_approval', 'replacement_urls', ['approval_id'], unique=False)
+    
+    # Create orders table
+    op.create_table('orders',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('item_id', sa.Integer(), nullable=False),
+    sa.Column('ordered', sa.Boolean(), nullable=False),
+    sa.Column('order_date', sa.String(length=10), nullable=True),
+    sa.Column('delivery_date', sa.String(length=10), nullable=True),
+    sa.Column('delivery_status', postgresql.ENUM('PENDING', 'ORDERED', 'SHIPPED', 'DELIVERED', 'CANCELLED', name='delivery_status_enum'), nullable=True),
+    sa.Column('quantity', sa.Integer(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.CheckConstraint('quantity IS NULL OR quantity > 0', name='orders_quantity_valid'),
+    sa.CheckConstraint("(order_date IS NULL OR order_date ~ '^\\d{2}/\\d{2}$') AND (delivery_date IS NULL OR delivery_date ~ '^\\d{2}/\\d{2}$')", name='orders_date_format'),
+    sa.CheckConstraint('(ordered = FALSE AND order_date IS NULL) OR (ordered = TRUE AND order_date IS NOT NULL)', name='orders_ordered_with_date'),
+    sa.ForeignKeyConstraint(['item_id'], ['items.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('item_id')
+    )
+    op.create_index('idx_orders_item', 'orders', ['item_id'], unique=False)
+    op.create_index('idx_orders_ordered', 'orders', ['ordered'], unique=False)
+    
+    # Create comments table
+    op.create_table('comments',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('item_id', sa.Integer(), nullable=False),
+    sa.Column('role', sa.String(length=20), nullable=False),
+    sa.Column('comment_text', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.CheckConstraint("role IN ('client', 'contractor')", name='comments_role_valid'),
+    sa.ForeignKeyConstraint(['item_id'], ['items.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('item_id', 'role', name='uq_comments_item_role')
+    )
+    op.create_index('idx_comments_item', 'comments', ['item_id'], unique=False)
+    
+    # Create edit_history table
+    op.create_table('edit_history',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('item_id', sa.Integer(), nullable=True),
+    sa.Column('user_id', sa.String(length=50), nullable=True),
+    sa.Column('section_id', sa.String(length=50), nullable=True),
+    sa.Column('section_label', sa.String(length=255), nullable=True),
+    sa.Column('product', sa.Text(), nullable=True),
+    sa.Column('field_path', sa.String(length=255), nullable=False),
+    sa.Column('old_value', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('new_value', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('source', sa.String(length=10), nullable=False),
+    sa.Column('timestamp', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.CheckConstraint("source IN ('manual', 'agent')", name='edit_history_source_valid'),
+    sa.CheckConstraint('LENGTH(field_path) > 0 AND LENGTH(field_path) <= 255', name='edit_history_field_path_length'),
+    sa.ForeignKeyConstraint(['item_id'], ['items.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_edit_history_item', 'edit_history', ['item_id'], unique=False)
+    op.create_index('idx_edit_history_timestamp', 'edit_history', ['timestamp'], unique=False)
+    op.create_index('idx_edit_history_user', 'edit_history', ['user_id'], unique=False)
+    
+    # Create custom_fields table
+    op.create_table('custom_fields',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('item_id', sa.Integer(), nullable=False),
+    sa.Column('field_name', sa.String(length=100), nullable=False),
+    sa.Column('field_value', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['item_id'], ['items.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('item_id', 'field_name', name='uq_custom_fields_item_field')
+    )
+    op.create_index('idx_custom_fields_item', 'custom_fields', ['item_id'], unique=False)
+    
+    # Create worker_jobs table
+    op.create_table('worker_jobs',
+    sa.Column('id', sa.String(length=50), nullable=False),
+    sa.Column('worker_id', sa.String(length=50), nullable=False),
+    sa.Column('project_id', sa.String(length=50), nullable=False),
+    sa.Column('job_type', postgresql.ENUM('DEMOLITION', 'STRUCTURAL', 'FACADE', 'EXTERIOR_JOINERY', 'PLASTERING', 'PLUMBING', 'ELECTRICAL', 'WALL_COVERING', 'INTERIOR_JOINERY', 'LANDSCAPING', 'PRICE_REVISION', name='work_type_enum'), nullable=True),
+    sa.Column('location', sa.String(length=255), nullable=True),
+    sa.Column('comment', sa.Text(), nullable=True),
+    sa.Column('start_date', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('end_date', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['worker_id'], ['workers.user_id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_worker_jobs_dates', 'worker_jobs', ['start_date', 'end_date'], unique=False)
     op.create_index('idx_worker_jobs_location', 'worker_jobs', ['location'], unique=False)
     op.create_index('idx_worker_jobs_project', 'worker_jobs', ['project_id'], unique=False)
     op.create_index('idx_worker_jobs_type', 'worker_jobs', ['job_type'], unique=False)
-    op.drop_constraint('worker_jobs_worker_id_fkey', 'worker_jobs', type_='foreignkey')
-    op.create_foreign_key(None, 'worker_jobs', 'workers', ['worker_id'], ['user_id'], ondelete='CASCADE')
-    op.create_foreign_key(None, 'worker_jobs', 'projects', ['project_id'], ['id'], ondelete='CASCADE')
-    op.drop_column('worker_jobs', 'chantier_name')
-    op.add_column('workers', sa.Column('user_id', sa.String(length=50), nullable=False))
-    op.add_column('workers', sa.Column('certificates', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
-    op.drop_index('idx_workers_name', table_name='workers')
-    op.create_index('idx_workers_certificates', 'workers', ['certificates'], unique=False, postgresql_using='gin')
-    op.create_foreign_key(None, 'workers', 'users', ['user_id'], ['id'], ondelete='CASCADE')
-    op.drop_column('workers', 'id')
-    op.drop_column('workers', 'email')
-    op.drop_column('workers', 'phone')
-    op.drop_column('workers', 'name')
+    op.create_index('idx_worker_jobs_worker', 'worker_jobs', ['worker_id'], unique=False)
     # ### end Alembic commands ###
 
 
