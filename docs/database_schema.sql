@@ -127,9 +127,7 @@ CREATE TABLE projects (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     address VARCHAR(255),
-    contractor_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Contractor managing this project
-    client_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Client owning this project
-    client_name VARCHAR(255),  -- REDUNDANT: Can be derived from client_id → users (kept for migration compatibility only)
+    owner_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Primary owner/contractor who created/manages this project
     status project_status_enum DEFAULT 'draft' NOT NULL,
     devis_status devis_status_enum,  -- NULL allowed (no devis yet)
     invoice_count INTEGER DEFAULT 0 NOT NULL,
@@ -155,8 +153,39 @@ CREATE TABLE projects (
 CREATE INDEX idx_projects_status ON projects(status);
 CREATE INDEX idx_projects_created ON projects(created_at DESC);
 CREATE INDEX idx_projects_dates ON projects(start_date, end_date) WHERE start_date IS NOT NULL;
-CREATE INDEX idx_projects_contractor ON projects(contractor_id) WHERE contractor_id IS NOT NULL;
-CREATE INDEX idx_projects_client ON projects(client_id) WHERE client_id IS NOT NULL;
+CREATE INDEX idx_projects_owner ON projects(owner_id) WHERE owner_id IS NOT NULL;
+
+
+-- ============================================================================
+-- PROJECT_MEMBERS (User-Project Memberships)
+-- ============================================================================
+-- Many-to-many relationship: Users can be members of multiple projects
+-- with different roles per project (contractor, client, architect, etc.)
+-- ============================================================================
+CREATE TYPE project_member_role_enum AS ENUM (
+    'contractor',
+    'client',
+    'architect',
+    'viewer',
+    'subcontractor'
+);
+
+CREATE TABLE project_members (
+    id SERIAL PRIMARY KEY,
+    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role project_member_role_enum NOT NULL,  -- Role on THIS project
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT uq_project_members_project_user UNIQUE(project_id, user_id)  -- One role per user per project
+);
+
+-- Indexes for project_members
+CREATE INDEX idx_project_members_project ON project_members(project_id);
+CREATE INDEX idx_project_members_user ON project_members(user_id);
+CREATE INDEX idx_project_members_role ON project_members(role);
+CREATE INDEX idx_project_members_project_role ON project_members(project_id, role);  -- For queries like "all contractors on project X"
 
 
 -- ============================================================================
