@@ -8,6 +8,17 @@
 -- and indexes for the France Renovation Contractor application.
 -- 
 -- Purpose: Clear SQL representation for schema discussion and review.
+-- 
+-- 📚 FOR THE BIG PICTURE:
+--    Read SCHEMA_OVERVIEW.md first for:
+--    - What the application does
+--    - Why the schema is designed this way
+--    - Core tables explanation
+--    - Design decisions and rationale
+--    - Migration context (before/after)
+-- 
+-- This SQL file shows HOW the schema is structured.
+-- The overview document explains WHY.
 -- ============================================================================
 
 -- ============================================================================
