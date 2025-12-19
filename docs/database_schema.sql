@@ -44,6 +44,40 @@ CREATE TYPE work_type_enum AS ENUM (
 );
 
 -- ============================================================================
+-- USERS (Authentication & Access Control)
+-- ============================================================================
+-- Stores user accounts for contractors, clients, and workers
+-- Supports web login and Zulip bot integration
+-- ============================================================================
+CREATE TYPE user_role_enum AS ENUM (
+    'contractor',
+    'client',
+    'worker',
+    'subcontractor'
+);
+
+CREATE TABLE users (
+    id VARCHAR(50) PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255),  -- Nullable if using OAuth only
+    role user_role_enum NOT NULL,
+    zulip_user_id VARCHAR(255),  -- For Zulip bot integration (nullable)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    last_login TIMESTAMP WITH TIME ZONE,
+    
+    -- Constraints
+    CONSTRAINT users_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT users_email_valid CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+);
+
+-- Indexes for users
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_zulip_user_id ON users(zulip_user_id) WHERE zulip_user_id IS NOT NULL;
+
+
+-- ============================================================================
 -- PROJECTS (Core Entity)
 -- ============================================================================
 -- Stores renovation projects/chantiers
@@ -53,7 +87,9 @@ CREATE TABLE projects (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     address VARCHAR(255),
-    client_name VARCHAR(255),
+    contractor_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Contractor managing this project
+    client_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Client owning this project
+    client_name VARCHAR(255),  -- Denormalized for backward compatibility (can be derived from client_id)
     status VARCHAR(50) DEFAULT 'draft' NOT NULL,  -- 'draft', 'ready', 'active', 'completed', 'archived'
     devis_status VARCHAR(50),  -- 'sent', 'approved', 'rejected', NULL
     invoice_count INTEGER DEFAULT 0 NOT NULL,
@@ -83,6 +119,8 @@ CREATE TABLE projects (
 CREATE INDEX idx_projects_status ON projects(status);
 CREATE INDEX idx_projects_created ON projects(created_at DESC);
 CREATE INDEX idx_projects_dates ON projects(start_date, end_date) WHERE start_date IS NOT NULL;
+CREATE INDEX idx_projects_contractor ON projects(contractor_id) WHERE contractor_id IS NOT NULL;
+CREATE INDEX idx_projects_client ON projects(client_id) WHERE client_id IS NOT NULL;
 
 
 -- ============================================================================
@@ -95,12 +133,14 @@ CREATE TABLE workers (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255),
     phone VARCHAR(50),
+    user_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Optional link to user account (for workers who log in)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
 -- Indexes for workers
 CREATE INDEX idx_workers_name ON workers(name);
+CREATE INDEX idx_workers_user ON workers(user_id) WHERE user_id IS NOT NULL;
 
 
 -- ============================================================================
@@ -284,6 +324,7 @@ CREATE INDEX idx_comments_item ON comments(item_id);
 CREATE TABLE edit_history (
     id SERIAL PRIMARY KEY,
     item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,  -- Keep history even if item deleted
+    user_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- User who made the change (for audit trail)
     section_id VARCHAR(50),
     section_label VARCHAR(255),
     product TEXT,
@@ -301,6 +342,7 @@ CREATE TABLE edit_history (
 -- Indexes for edit_history
 CREATE INDEX idx_edit_history_item ON edit_history(item_id);
 CREATE INDEX idx_edit_history_timestamp ON edit_history(timestamp DESC);
+CREATE INDEX idx_edit_history_user ON edit_history(user_id) WHERE user_id IS NOT NULL;
 
 
 -- ============================================================================
@@ -328,6 +370,12 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 -- RELATIONSHIPS SUMMARY
 -- ============================================================================
 -- 
+-- Authentication & Access:
+--   users (1) ──< (0 or N) projects.contractor_id (SET NULL on delete)
+--   users (1) ──< (0 or N) projects.client_id (SET NULL on delete)
+--   users (1) ──< (0 or 1) workers.user_id (SET NULL on delete, nullable)
+--   users (1) ──< (0 or N) edit_history.user_id (SET NULL on delete, nullable)
+-- 
 -- Core Hierarchy:
 --   projects (1) ──< (N) sections (1) ──< (N) items
 --   
@@ -348,4 +396,6 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 --   - Deleting an approval → deletes replacement_urls
 --   - Deleting a worker → deletes all worker_jobs
 --   - edit_history.item_id → SET NULL (preserves audit trail)
+--   - Deleting a user → SET NULL on projects (contractor_id/client_id), workers.user_id, edit_history.user_id
+--     (preserves data, just removes user linkage)
 -- ============================================================================
