@@ -328,12 +328,12 @@ CREATE INDEX idx_items_labor_type ON items(labor_type);
 -- ============================================================================
 -- APPROVALS (Approval Tracking)
 -- ============================================================================
--- Tracks approval status by role (client/cray) for each item
+-- Tracks approval status by role (client/contractor) for each item
 -- ============================================================================
 CREATE TABLE approvals (
     id SERIAL PRIMARY KEY,
     item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    role VARCHAR(10) NOT NULL CHECK (role IN ('client', 'cray')),
+    role VARCHAR(20) NOT NULL CHECK (role IN ('client', 'contractor')),
     status approval_status_enum,  -- NULL allowed (no status set yet)
     note TEXT,
     validated_at TIMESTAMP WITH TIME ZONE,
@@ -403,12 +403,12 @@ CREATE INDEX idx_orders_ordered ON orders(ordered);
 -- ============================================================================
 -- COMMENTS (Comments by Role)
 -- ============================================================================
--- Stores comments by role (client/cray) for each item
+-- Stores comments by role (client/contractor) for each item
 -- ============================================================================
 CREATE TABLE comments (
     id SERIAL PRIMARY KEY,
     item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    role VARCHAR(10) NOT NULL CHECK (role IN ('client', 'cray')),
+    role VARCHAR(20) NOT NULL CHECK (role IN ('client', 'contractor')),
     comment_text TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
