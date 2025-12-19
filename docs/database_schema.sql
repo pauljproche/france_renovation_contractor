@@ -1,0 +1,316 @@
+-- ============================================================================
+-- France Renovation Contractor Database Schema
+-- PostgreSQL 15
+-- Generated: 2025-12-18
+-- ============================================================================
+-- 
+-- This file contains the complete database schema with all tables, constraints,
+-- and indexes for the France Renovation Contractor application.
+-- 
+-- Purpose: Clear SQL representation for schema discussion and review.
+-- ============================================================================
+
+-- ============================================================================
+-- PROJECTS (Core Entity)
+-- ============================================================================
+-- Stores renovation projects/chantiers
+-- Note: Demo projects remain hardcoded in frontend, not stored in DB
+-- ============================================================================
+CREATE TABLE projects (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    address VARCHAR(255),
+    client_name VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'draft' NOT NULL,  -- 'draft', 'ready', 'active', 'completed', 'archived'
+    devis_status VARCHAR(50),  -- 'sent', 'approved', 'rejected', NULL
+    invoice_count INTEGER DEFAULT 0 NOT NULL,
+    percentage_paid INTEGER DEFAULT 0 NOT NULL,
+    start_date TIMESTAMP WITH TIME ZONE,
+    end_date TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    is_demo BOOLEAN DEFAULT FALSE NOT NULL,
+    has_data BOOLEAN DEFAULT FALSE NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT projects_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT projects_name_length CHECK (LENGTH(name) > 0 AND LENGTH(name) <= 255),
+    CONSTRAINT projects_status_valid CHECK (status IN ('draft', 'ready', 'active', 'completed', 'archived')),
+    CONSTRAINT projects_devis_status_valid CHECK (
+        devis_status IS NULL OR devis_status IN ('sent', 'approved', 'rejected')
+    ),
+    CONSTRAINT projects_date_range_valid CHECK (
+        start_date IS NULL OR end_date IS NULL OR start_date <= end_date
+    ),
+    CONSTRAINT projects_invoice_count_valid CHECK (invoice_count >= 0),
+    CONSTRAINT projects_percentage_paid_valid CHECK (percentage_paid >= 0 AND percentage_paid <= 100)
+);
+
+-- Indexes for projects
+CREATE INDEX idx_projects_status ON projects(status);
+CREATE INDEX idx_projects_created ON projects(created_at DESC);
+CREATE INDEX idx_projects_dates ON projects(start_date, end_date) WHERE start_date IS NOT NULL;
+
+
+-- ============================================================================
+-- WORKERS (Core Entity)
+-- ============================================================================
+-- Stores salaried workers information
+-- ============================================================================
+CREATE TABLE workers (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    phone VARCHAR(50),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- Indexes for workers
+CREATE INDEX idx_workers_name ON workers(name);
+
+
+-- ============================================================================
+-- WORKER_JOBS (Worker Assignments)
+-- ============================================================================
+-- Jobs/tasks assigned to workers
+-- chantier_name logically links to projects.address
+-- ============================================================================
+CREATE TABLE worker_jobs (
+    id VARCHAR(50) PRIMARY KEY,
+    worker_id VARCHAR(50) NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    chantier_name VARCHAR(255) NOT NULL,  -- References project address/name
+    job_type VARCHAR(50),  -- 'plumbing', 'electrical', 'demo', etc.
+    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_date TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- Indexes for worker_jobs
+CREATE INDEX idx_worker_jobs_worker ON worker_jobs(worker_id);
+CREATE INDEX idx_worker_jobs_chantier ON worker_jobs(chantier_name);
+CREATE INDEX idx_worker_jobs_dates ON worker_jobs(start_date, end_date);
+
+
+-- ============================================================================
+-- SECTIONS (Material Categories)
+-- ============================================================================
+-- Groups items by category (e.g., "Cuisine", "Salle de bain")
+-- Linked to projects
+-- ============================================================================
+CREATE TABLE sections (
+    id VARCHAR(50) PRIMARY KEY,
+    label VARCHAR(255) NOT NULL,
+    project_id VARCHAR(50) REFERENCES projects(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT sections_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT sections_label_length CHECK (LENGTH(label) > 0 AND LENGTH(label) <= 255)
+);
+
+-- Indexes for sections
+CREATE INDEX idx_sections_project ON sections(project_id);
+
+
+-- ============================================================================
+-- ITEMS (Materials/Products)
+-- ============================================================================
+-- Individual products/materials in each section
+-- ============================================================================
+CREATE TABLE items (
+    id SERIAL PRIMARY KEY,
+    section_id VARCHAR(50) NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+    product TEXT NOT NULL,
+    reference VARCHAR(255),
+    supplier_link TEXT,
+    labor_type VARCHAR(50),
+    price_ttc NUMERIC(10, 2),
+    price_ht_quote NUMERIC(10, 2),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT items_product_not_empty CHECK (LENGTH(TRIM(product)) > 0),
+    CONSTRAINT items_price_ttc_valid CHECK (price_ttc IS NULL OR price_ttc >= 0),
+    CONSTRAINT items_price_ht_valid CHECK (price_ht_quote IS NULL OR price_ht_quote >= 0),
+    CONSTRAINT uq_items_section_product UNIQUE(section_id, product)  -- Prevent duplicates
+);
+
+-- Indexes for items
+CREATE INDEX idx_items_section ON items(section_id);
+CREATE INDEX idx_items_product ON items(product);
+CREATE INDEX idx_items_updated ON items(updated_at DESC);
+
+
+-- ============================================================================
+-- APPROVALS (Approval Tracking)
+-- ============================================================================
+-- Tracks approval status by role (client/cray) for each item
+-- ============================================================================
+CREATE TABLE approvals (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL,  -- 'client' or 'cray'
+    status VARCHAR(50),  -- 'approved', 'rejected', 'change_order', 'pending', 'supplied_by', NULL
+    note TEXT,
+    validated_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT approvals_role_valid CHECK (role IN ('client', 'cray')),
+    CONSTRAINT approvals_status_valid CHECK (
+        status IS NULL OR status IN ('approved', 'rejected', 'change_order', 'pending', 'supplied_by')
+    ),
+    CONSTRAINT uq_approvals_item_role UNIQUE(item_id, role)  -- One approval per role per item
+);
+
+-- Indexes for approvals
+CREATE INDEX idx_approvals_item ON approvals(item_id);
+CREATE INDEX idx_approvals_item_role ON approvals(item_id, role);  -- Composite for common query
+CREATE INDEX idx_approvals_status ON approvals(status) WHERE status IS NOT NULL;
+
+
+-- ============================================================================
+-- REPLACEMENT_URLS (Replacement URLs Array)
+-- ============================================================================
+-- Stores array of replacement URLs for approvals
+-- Normalized: One row per URL (array converted to separate table)
+-- ============================================================================
+CREATE TABLE replacement_urls (
+    id SERIAL PRIMARY KEY,
+    approval_id INTEGER NOT NULL REFERENCES approvals(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- Indexes for replacement_urls
+CREATE INDEX idx_replacement_urls_approval ON replacement_urls(approval_id);
+
+
+-- ============================================================================
+-- ORDERS (Order Tracking)
+-- ============================================================================
+-- Tracks ordering and delivery information for items
+-- ============================================================================
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE UNIQUE,  -- One order per item
+    ordered BOOLEAN DEFAULT FALSE NOT NULL,
+    order_date VARCHAR(10),  -- Format: 'dd/mm'
+    delivery_date VARCHAR(10),  -- Format: 'dd/mm'
+    delivery_status VARCHAR(50),
+    quantity INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT orders_quantity_valid CHECK (quantity IS NULL OR quantity > 0),
+    CONSTRAINT orders_date_format CHECK (
+        (order_date IS NULL OR order_date ~ '^\d{2}/\d{2}$') AND
+        (delivery_date IS NULL OR delivery_date ~ '^\d{2}/\d{2}$')
+    )
+);
+
+-- Indexes for orders
+CREATE INDEX idx_orders_item ON orders(item_id);
+CREATE INDEX idx_orders_ordered ON orders(ordered);
+
+
+-- ============================================================================
+-- COMMENTS (Comments by Role)
+-- ============================================================================
+-- Stores comments by role (client/cray) for each item
+-- ============================================================================
+CREATE TABLE comments (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL,  -- 'client' or 'cray'
+    comment_text TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT uq_comments_item_role UNIQUE(item_id, role)
+);
+
+-- Indexes for comments
+CREATE INDEX idx_comments_item ON comments(item_id);
+
+
+-- ============================================================================
+-- EDIT_HISTORY (Audit Trail)
+-- ============================================================================
+-- Tracks all changes to items for audit purposes
+-- ============================================================================
+CREATE TABLE edit_history (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,  -- Keep history even if item deleted
+    section_id VARCHAR(50),
+    section_label VARCHAR(255),
+    product TEXT,
+    field_path VARCHAR(255) NOT NULL,  -- e.g., 'price_ttc', 'approvals.client.status'
+    old_value JSONB,
+    new_value JSONB,
+    source VARCHAR(50) DEFAULT 'manual' NOT NULL,  -- 'manual' or 'agent'
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT edit_history_source_valid CHECK (source IN ('manual', 'agent')),
+    CONSTRAINT edit_history_field_path_length CHECK (LENGTH(field_path) > 0 AND LENGTH(field_path) <= 255)
+);
+
+-- Indexes for edit_history
+CREATE INDEX idx_edit_history_item ON edit_history(item_id);
+CREATE INDEX idx_edit_history_timestamp ON edit_history(timestamp DESC);
+
+
+-- ============================================================================
+-- CUSTOM_FIELDS (Extensible Fields)
+-- ============================================================================
+-- Allows extending items with custom fields dynamically
+-- ============================================================================
+CREATE TABLE custom_fields (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    field_name VARCHAR(100) NOT NULL,
+    field_value JSONB,  -- Flexible value storage
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT uq_custom_fields_item_field UNIQUE(item_id, field_name)
+);
+
+-- Indexes for custom_fields
+CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
+
+
+-- ============================================================================
+-- RELATIONSHIPS SUMMARY
+-- ============================================================================
+-- 
+-- Core Hierarchy:
+--   projects (1) ──< (N) sections (1) ──< (N) items
+--   
+-- Items Relationships:
+--   items (1) ──< (N) approvals (1) ──< (N) replacement_urls
+--   items (1) ──< (1) orders
+--   items (1) ──< (N) comments
+--   items (1) ──< (N) custom_fields
+--   items (1) ──< (N) edit_history
+--   
+-- Workers:
+--   workers (1) ──< (N) worker_jobs
+--   worker_jobs.chantier_name → projects.address (logical link)
+-- 
+-- CASCADE Rules:
+--   - Deleting a project → deletes all sections → deletes all items → cascades through
+--   - Deleting an item → deletes approvals, orders, comments, custom_fields
+--   - Deleting an approval → deletes replacement_urls
+--   - Deleting a worker → deletes all worker_jobs
+--   - edit_history.item_id → SET NULL (preserves audit trail)
+-- ============================================================================
