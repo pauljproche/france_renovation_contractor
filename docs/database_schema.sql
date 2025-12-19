@@ -1,0 +1,512 @@
+-- ============================================================================
+-- France Renovation Contractor Database Schema
+-- PostgreSQL 15
+-- Generated: 2025-12-18
+-- ============================================================================
+-- 
+-- This file contains the complete database schema with all tables, constraints,
+-- and indexes for the France Renovation Contractor application.
+-- 
+-- Purpose: Clear SQL representation for schema discussion and review.
+-- 
+-- 📚 FOR THE BIG PICTURE:
+--    Read SCHEMA_OVERVIEW.md first for:
+--    - What the application does
+--    - Why the schema is designed this way
+--    - Core tables explanation
+--    - Design decisions and rationale
+--    - Migration context (before/after)
+-- 
+-- This SQL file shows HOW the schema is structured.
+-- The overview document explains WHY.
+-- ============================================================================
+
+-- ============================================================================
+-- ENUMS
+-- ============================================================================
+-- Work type enum: Centralized work/job types used for both materials (labor_type)
+-- and worker assignments (job_type). Values are in English (simple, programmatic)
+-- and can be translated in the frontend UI.
+-- ============================================================================
+CREATE TYPE work_type_enum AS ENUM (
+    'demolition',
+    'structural',
+    'facade',
+    'exterior_joinery',
+    'plastering',
+    'plumbing',
+    'electrical',
+    'wall_covering',
+    'interior_joinery',
+    'landscaping',
+    'price_revision'
+);
+
+-- Approval role: Only 2 values, determined by user login (not directly selected)
+-- Using VARCHAR with CHECK instead of enum for simplicity
+
+-- Project status enum: Lifecycle status of projects
+CREATE TYPE project_status_enum AS ENUM (
+    'draft',
+    'ready',
+    'active',
+    'completed',
+    'archived'
+);
+
+-- Quote status enum: Quote approval status
+CREATE TYPE quote_status_enum AS ENUM (
+    'draft',
+    'sent',
+    'approved',
+    'rejected',
+    'superseded'  -- Replaced by a newer quote version
+);
+
+-- Approval status enum: Status of item approvals
+CREATE TYPE approval_status_enum AS ENUM (
+    'approved',
+    'rejected',
+    'change_order',
+    'pending',
+    'supplied_by'
+);
+
+-- Edit source: Only 2 values, internal tracking (users don't select)
+-- Using VARCHAR with CHECK instead of enum for simplicity
+
+-- Delivery status enum: Status of item delivery
+CREATE TYPE delivery_status_enum AS ENUM (
+    'pending',
+    'ordered',
+    'shipped',
+    'delivered',
+    'cancelled'
+);
+
+-- ============================================================================
+-- USERS (Authentication & Access Control)
+-- ============================================================================
+-- Stores user accounts for contractors, clients, and workers
+-- Supports web login and Zulip bot integration
+-- ============================================================================
+CREATE TYPE user_role_enum AS ENUM (
+    'contractor',
+    'client',
+    'worker',
+    'subcontractor'
+);
+
+CREATE TABLE users (
+    id VARCHAR(50) PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255),  -- Nullable if using OAuth only
+    role user_role_enum NOT NULL,
+    zulip_user_id VARCHAR(255),  -- For Zulip bot integration (nullable)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    last_login TIMESTAMP WITH TIME ZONE,
+    
+    -- Constraints
+    CONSTRAINT users_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT users_email_valid CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+);
+
+-- Indexes for users
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_zulip_user_id ON users(zulip_user_id) WHERE zulip_user_id IS NOT NULL;
+
+
+-- ============================================================================
+-- PROJECTS (Core Entity)
+-- ============================================================================
+-- Stores renovation projects/chantiers
+-- Note: Demo projects remain hardcoded in frontend, not stored in DB
+-- ============================================================================
+CREATE TABLE projects (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    address VARCHAR(255),
+    owner_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,  -- Primary owner/contractor who created/manages this project (required, prevents orphaned projects)
+    status project_status_enum DEFAULT 'draft' NOT NULL,
+    invoice_count INTEGER DEFAULT 0 NOT NULL,
+    percentage_paid INTEGER DEFAULT 0 NOT NULL,
+    start_date TIMESTAMP WITH TIME ZONE,
+    end_date TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    is_demo BOOLEAN DEFAULT FALSE NOT NULL,
+    has_data BOOLEAN DEFAULT FALSE NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT projects_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT projects_name_length CHECK (LENGTH(name) > 0 AND LENGTH(name) <= 255),
+    CONSTRAINT projects_date_range_valid CHECK (
+        start_date IS NULL OR end_date IS NULL OR start_date <= end_date
+    ),
+    CONSTRAINT projects_invoice_count_valid CHECK (invoice_count >= 0),
+    CONSTRAINT projects_percentage_paid_valid CHECK (percentage_paid >= 0 AND percentage_paid <= 100)
+);
+
+-- Indexes for projects
+CREATE INDEX idx_projects_status ON projects(status);
+CREATE INDEX idx_projects_created ON projects(created_at DESC);
+CREATE INDEX idx_projects_dates ON projects(start_date, end_date) WHERE start_date IS NOT NULL;
+CREATE INDEX idx_projects_owner ON projects(owner_id) WHERE owner_id IS NOT NULL;
+
+
+-- ============================================================================
+-- PROJECT_MEMBERS (User-Project Memberships)
+-- ============================================================================
+-- Many-to-many relationship: Users can be members of multiple projects
+-- with different roles per project (contractor, client, architect, etc.)
+-- ============================================================================
+CREATE TYPE project_member_role_enum AS ENUM (
+    'contractor',
+    'client',
+    'architect',
+    'viewer',
+    'subcontractor'
+);
+
+CREATE TABLE project_members (
+    id SERIAL PRIMARY KEY,
+    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role project_member_role_enum NOT NULL,  -- Role on THIS project
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT uq_project_members_project_user UNIQUE(project_id, user_id)  -- One role per user per project
+);
+
+-- Indexes for project_members
+CREATE INDEX idx_project_members_project ON project_members(project_id);
+CREATE INDEX idx_project_members_user ON project_members(user_id);
+CREATE INDEX idx_project_members_role ON project_members(role);
+CREATE INDEX idx_project_members_project_role ON project_members(project_id, role);  -- For queries like "all contractors on project X"
+
+
+-- ============================================================================
+-- QUOTES (Project Quotes/Devis)
+-- ============================================================================
+-- Stores quotes (devis) sent to clients for projects
+-- Multiple quotes per project supported (for revisions, updates, etc.)
+-- Initial quote is the itemized estimate/quote sent to client for approval
+-- ============================================================================
+CREATE TABLE quotes (
+    id VARCHAR(50) PRIMARY KEY,
+    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    status quote_status_enum DEFAULT 'draft' NOT NULL,
+    version_number INTEGER DEFAULT 1 NOT NULL,  -- Version number for multiple quotes (1, 2, 3, etc.)
+    sent_at TIMESTAMP WITH TIME ZONE,  -- When quote was sent to client
+    approved_at TIMESTAMP WITH TIME ZONE,  -- When quote was approved
+    rejected_at TIMESTAMP WITH TIME ZONE,  -- When quote was rejected
+    notes TEXT,  -- Optional notes about this quote
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT quotes_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT quotes_version_positive CHECK (version_number > 0),
+    CONSTRAINT quotes_status_dates_consistent CHECK (
+        (status = 'draft' AND sent_at IS NULL) OR
+        (status IN ('sent', 'approved', 'rejected', 'superseded') AND sent_at IS NOT NULL) OR
+        (status = 'draft')
+    )
+);
+
+-- Indexes for quotes
+CREATE INDEX idx_quotes_project ON quotes(project_id);
+CREATE INDEX idx_quotes_status ON quotes(status);
+CREATE INDEX idx_quotes_project_status ON quotes(project_id, status);  -- For finding active quotes per project
+CREATE INDEX idx_quotes_created ON quotes(created_at DESC);
+
+
+-- ============================================================================
+-- WORKERS (Worker-Specific Information)
+-- ============================================================================
+-- Stores worker-specific information (diplomas, certificates, etc.)
+-- One-to-one relationship with users: a worker IS a user with additional worker data
+-- Note: Basic info (name, email) comes from users table
+-- ============================================================================
+CREATE TABLE workers (
+    user_id VARCHAR(50) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,  -- PK = FK to users (one-to-one)
+    certificates JSONB,  -- Optional: Array of certificates/diplomas
+    -- Example structure: [
+    --   {"name": "Electrician License", "issuing_org": "French Electric Authority", "date": "2020-01-15", "expires": "2025-01-15"},
+    --   {"name": "Plumbing Certificate", "issuing_org": "Trade School", "date": "2018-06-01", "expires": null}
+    -- ]
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- Index for certificates JSONB field (useful for queries filtering by certificate name/type)
+CREATE INDEX idx_workers_certificates ON workers USING GIN (certificates);
+
+
+-- ============================================================================
+-- SECTIONS (Material Categories)
+-- ============================================================================
+-- Groups items by category (e.g., "Cuisine", "Salle de bain")
+-- Linked to projects
+-- ============================================================================
+CREATE TABLE sections (
+    id VARCHAR(50) PRIMARY KEY,
+    label VARCHAR(255) NOT NULL,
+    project_id VARCHAR(50) REFERENCES projects(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT sections_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT sections_label_length CHECK (LENGTH(label) > 0 AND LENGTH(label) <= 255)
+);
+
+-- Indexes for sections
+CREATE INDEX idx_sections_project ON sections(project_id);
+
+
+-- ============================================================================
+-- ITEMS (Materials/Products)
+-- ============================================================================
+-- Individual products/materials in each section
+-- ============================================================================
+CREATE TABLE items (
+    id SERIAL PRIMARY KEY,
+    section_id VARCHAR(50) NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+    product TEXT NOT NULL,
+    reference VARCHAR(255),
+    supplier_link TEXT,
+    labor_type work_type_enum,  -- Type of work needed (uses work_type_enum)
+    price_ttc NUMERIC(10, 2),
+    price_ht_quote NUMERIC(10, 2),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT items_product_not_empty CHECK (LENGTH(TRIM(product)) > 0),
+    CONSTRAINT items_price_ttc_valid CHECK (price_ttc IS NULL OR price_ttc >= 0),
+    CONSTRAINT items_price_ht_valid CHECK (price_ht_quote IS NULL OR price_ht_quote >= 0),
+    CONSTRAINT uq_items_section_product UNIQUE(section_id, product)  -- Prevent duplicates
+);
+
+-- Indexes for items
+CREATE INDEX idx_items_section ON items(section_id);
+CREATE INDEX idx_items_product ON items(product);
+CREATE INDEX idx_items_updated ON items(updated_at DESC);
+CREATE INDEX idx_items_labor_type ON items(labor_type);
+
+
+-- ============================================================================
+-- APPROVALS (Approval Tracking)
+-- ============================================================================
+-- Tracks approval status by role (client/contractor) for each item
+-- ============================================================================
+CREATE TABLE approvals (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('client', 'contractor')),
+    status approval_status_enum,  -- NULL allowed (no status set yet)
+    note TEXT,
+    validated_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT uq_approvals_item_role UNIQUE(item_id, role)  -- One approval per role per item
+);
+
+-- Indexes for approvals
+CREATE INDEX idx_approvals_item ON approvals(item_id);
+CREATE INDEX idx_approvals_item_role ON approvals(item_id, role);  -- Composite for common query
+CREATE INDEX idx_approvals_status ON approvals(status) WHERE status IS NOT NULL;
+
+
+-- ============================================================================
+-- REPLACEMENT_URLS (Replacement URLs Array)
+-- ============================================================================
+-- Stores array of replacement URLs for approvals
+-- Normalized: One row per URL (array converted to separate table)
+-- ============================================================================
+CREATE TABLE replacement_urls (
+    id SERIAL PRIMARY KEY,
+    approval_id INTEGER NOT NULL REFERENCES approvals(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- Indexes for replacement_urls
+CREATE INDEX idx_replacement_urls_approval ON replacement_urls(approval_id);
+
+
+-- ============================================================================
+-- ORDERS (Order Tracking)
+-- ============================================================================
+-- Tracks ordering and delivery information for items
+-- ============================================================================
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE UNIQUE,  -- One order per item
+    ordered BOOLEAN DEFAULT FALSE NOT NULL,
+    order_date VARCHAR(10),  -- Format: 'dd/mm' (kept as VARCHAR for frontend compatibility)
+    delivery_date VARCHAR(10),  -- Format: 'dd/mm' (kept as VARCHAR for frontend compatibility)
+    delivery_status delivery_status_enum,
+    quantity INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT orders_quantity_valid CHECK (quantity IS NULL OR quantity > 0),
+    CONSTRAINT orders_ordered_with_date CHECK (
+        (ordered = FALSE AND order_date IS NULL) OR 
+        (ordered = TRUE AND order_date IS NOT NULL)
+    ),  -- If ordered=true, order_date must be set
+    CONSTRAINT orders_date_format CHECK (
+        (order_date IS NULL OR order_date ~ '^\d{2}/\d{2}$') AND
+        (delivery_date IS NULL OR delivery_date ~ '^\d{2}/\d{2}$')
+    )
+);
+
+-- Indexes for orders
+CREATE INDEX idx_orders_item ON orders(item_id);
+CREATE INDEX idx_orders_ordered ON orders(ordered);
+
+
+-- ============================================================================
+-- COMMENTS (Comments by Role)
+-- ============================================================================
+-- Stores comments by role (client/contractor) for each item
+-- ============================================================================
+CREATE TABLE comments (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('client', 'contractor')),
+    comment_text TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT uq_comments_item_role UNIQUE(item_id, role)
+);
+
+-- Indexes for comments
+CREATE INDEX idx_comments_item ON comments(item_id);
+
+
+-- ============================================================================
+-- EDIT_HISTORY (Audit Trail)
+-- ============================================================================
+-- Tracks all changes to items for audit purposes
+-- ============================================================================
+CREATE TABLE edit_history (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,  -- Keep history even if item deleted
+    user_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- User who made the change (for audit trail)
+    section_id VARCHAR(50),
+    section_label VARCHAR(255),
+    product TEXT,
+    field_path VARCHAR(255) NOT NULL,  -- e.g., 'price_ttc', 'approvals.client.status'
+    old_value JSONB,
+    new_value JSONB,
+    source VARCHAR(10) DEFAULT 'manual' NOT NULL CHECK (source IN ('manual', 'agent')),
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT edit_history_field_path_length CHECK (LENGTH(field_path) > 0 AND LENGTH(field_path) <= 255)
+);
+
+-- Indexes for edit_history
+CREATE INDEX idx_edit_history_item ON edit_history(item_id);
+CREATE INDEX idx_edit_history_timestamp ON edit_history(timestamp DESC);
+CREATE INDEX idx_edit_history_user ON edit_history(user_id) WHERE user_id IS NOT NULL;
+
+
+-- ============================================================================
+-- CUSTOM_FIELDS (Extensible Fields)
+-- ============================================================================
+-- Allows extending items with custom fields dynamically
+-- ============================================================================
+CREATE TABLE custom_fields (
+    id SERIAL PRIMARY KEY,
+    item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+    field_name VARCHAR(100) NOT NULL,
+    field_value JSONB,  -- Flexible value storage
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT uq_custom_fields_item_field UNIQUE(item_id, field_name)
+);
+
+-- Indexes for custom_fields
+CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
+
+
+-- ============================================================================
+-- WORKER_JOBS (Worker Assignments)
+-- ============================================================================
+-- Jobs/tasks assigned to workers on specific projects
+-- ============================================================================
+CREATE TABLE worker_jobs (
+    id VARCHAR(50) PRIMARY KEY,
+    worker_id VARCHAR(50) NOT NULL REFERENCES workers(user_id) ON DELETE CASCADE,  -- References workers.user_id (which is also users.id)
+    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,  -- Direct FK to project
+    job_type work_type_enum,  -- Type of work assigned (uses work_type_enum)
+    location VARCHAR(255),  -- Optional: Location where work is performed (e.g., "kitchen", "bathroom", "living room")
+    comment TEXT,  -- Optional: Additional notes/comments about the job
+    start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_date TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- Indexes for worker_jobs
+CREATE INDEX idx_worker_jobs_worker ON worker_jobs(worker_id);
+CREATE INDEX idx_worker_jobs_project ON worker_jobs(project_id);
+CREATE INDEX idx_worker_jobs_dates ON worker_jobs(start_date, end_date);
+CREATE INDEX idx_worker_jobs_type ON worker_jobs(job_type);
+CREATE INDEX idx_worker_jobs_location ON worker_jobs(location) WHERE location IS NOT NULL;  -- Partial index for location queries
+
+
+-- ============================================================================
+-- RELATIONSHIPS SUMMARY
+-- ============================================================================
+-- 
+-- Authentication & Access:
+--   users (1) ──< (1 or N) projects.owner_id (RESTRICT on delete - ensures at least one owner per project)
+--   users (1) ──< (0 or N) project_members (many-to-many with role, CASCADE delete)
+--   users (1) ──< (0 or 1) workers (one-to-one, workers.user_id = PK = FK to users.id, CASCADE delete)
+--   users (1) ──< (0 or N) edit_history.user_id (SET NULL on delete, nullable)
+--   projects (1) ──< (N) project_members (CASCADE delete)
+-- 
+-- Core Hierarchy:
+--   projects (1) ──< (N) quotes (multiple quotes per project, versioned)
+--   projects (1) ──< (N) sections (1) ──< (N) items
+--   
+-- Items Relationships:
+--   items (1) ──< (N) approvals (1) ──< (N) replacement_urls
+--   items (1) ──< (1) orders
+--   items (1) ──< (N) comments
+--   items (1) ──< (N) custom_fields
+--   items (1) ──< (N) edit_history
+--   
+-- Workers:
+--   workers (1) ──< (N) worker_jobs
+--   projects (1) ──< (N) worker_jobs (direct FK)
+-- 
+-- CASCADE Rules:
+--   - Deleting a project → deletes all quotes (CASCADE)
+--   - Deleting a project → deletes all sections → deletes all items → cascades through
+--   - Deleting a project → deletes project_members (CASCADE)
+--   - Deleting an item → deletes approvals, orders, comments, custom_fields
+--   - Deleting an approval → deletes replacement_urls
+--   - Deleting a worker (user) → deletes workers row (CASCADE) → deletes all worker_jobs (CASCADE)
+--   - Deleting a user → deletes project_members (CASCADE)
+--   - Deleting a user → deletes workers row if user is a worker (CASCADE)
+--   - Deleting a user → RESTRICT if user is owner of any projects (prevents orphaned projects)
+--   - edit_history.item_id → SET NULL (preserves audit trail)
+--   - Deleting a user → SET NULL on edit_history.user_id (preserves audit trail, just removes user linkage)
+--     (but NOT for projects.owner_id - RESTRICT applies, NOT for workers - CASCADE applies)
+-- ============================================================================

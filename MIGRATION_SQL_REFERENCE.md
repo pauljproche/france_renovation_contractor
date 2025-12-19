@@ -10,10 +10,10 @@ Quick reference for database schema and SQL functions used in the migration.
 projects
   └── sections
       └── items
-          ├── approvals (one per role: client/cray)
+          ├── approvals (one per role: client/contractor)
           │   └── replacement_urls (array as table)
           ├── orders
-          ├── comments (one per role: client/cray)
+          ├── comments (one per role: client/contractor)
           └── custom_fields
 
 workers
@@ -52,9 +52,9 @@ SELECT
     ac.status as client_status,
     ac.note as client_note,
     ac.validated_at as client_validated_at,
-    -- Cray approval
-    ay.status as cray_status,
-    ay.note as cray_note,
+    -- Contractor approval
+    acont.status as contractor_status,
+    acont.note as contractor_note,
     -- Order info
     o.ordered,
     o.order_date,
@@ -62,14 +62,14 @@ SELECT
     o.delivery_status,
     o.quantity,
     -- Comments
-    cc.comment_text as cray_comment,
+    ccont.comment_text as contractor_comment,
     cl.comment_text as client_comment
 FROM sections s
 JOIN items i ON i.section_id = s.id
 LEFT JOIN approvals ac ON ac.item_id = i.id AND ac.role = 'client'
-LEFT JOIN approvals ay ON ay.item_id = i.id AND ay.role = 'cray'
+LEFT JOIN approvals acont ON acont.item_id = i.id AND acont.role = 'contractor'
 LEFT JOIN orders o ON o.item_id = i.id
-LEFT JOIN comments cc ON cc.item_id = i.id AND cc.role = 'cray'
+LEFT JOIN comments ccont ON ccont.item_id = i.id AND ccont.role = 'contractor'
 LEFT JOIN comments cl ON cl.item_id = i.id AND cl.role = 'client'
 ORDER BY s.label, i.product;
 ```
@@ -293,7 +293,7 @@ CREATE OR REPLACE FUNCTION get_item_status(p_item_id INTEGER)
 RETURNS TABLE (
     product TEXT,
     client_status VARCHAR,
-    cray_status VARCHAR,
+    contractor_status VARCHAR,
     ordered BOOLEAN,
     delivery_date VARCHAR
 ) AS $$
@@ -302,12 +302,12 @@ BEGIN
     SELECT 
         i.product,
         ac.status as client_status,
-        ay.status as cray_status,
+        acont.status as contractor_status,
         COALESCE(o.ordered, FALSE) as ordered,
         o.delivery_date
     FROM items i
     LEFT JOIN approvals ac ON ac.item_id = i.id AND ac.role = 'client'
-    LEFT JOIN approvals ay ON ay.item_id = i.id AND ay.role = 'cray'
+    LEFT JOIN approvals acont ON acont.item_id = i.id AND acont.role = 'contractor'
     LEFT JOIN orders o ON o.item_id = i.id
     WHERE i.id = p_item_id;
 END;
@@ -326,14 +326,14 @@ SELECT * FROM get_items_needing_validation('client');
 SELECT * FROM get_todo_items('client');
 ```
 
-### Contractor (Cray) Role Queries
+### Contractor Role Queries
 
 ```sql
--- Items needing cray validation
-SELECT * FROM get_items_needing_validation('cray');
+-- Items needing contractor validation
+SELECT * FROM get_items_needing_validation('contractor');
 
 -- Contractor's TODO items
-SELECT * FROM get_todo_items('cray');
+SELECT * FROM get_todo_items('contractor');
 ```
 
 ### Timeline & Workers Queries
@@ -525,6 +525,7 @@ WHERE NOT EXISTS (
     SELECT 1 FROM approvals a WHERE a.item_id = i.id
 );
 ```
+
 
 
 

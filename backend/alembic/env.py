@@ -13,8 +13,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # Import our models and Base
 from database import Base, engine
 from models import (
+    User, Project, ProjectMember, Quote, Worker, WorkerJob,
     Section, Item, Approval, ReplacementURL, Order, Comment,
-    EditHistory, CustomField, Project, Worker, WorkerJob
+    EditHistory, CustomField
 )
 
 # this is the Alembic Config object, which provides

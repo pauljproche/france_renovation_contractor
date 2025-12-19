@@ -97,3 +97,4 @@ USE_DATABASE=false  # Set to true when ready to use database
 - **Easy cleanup** and reset during development
 - **Consistent** across team members
 - **Same PostgreSQL version** (15) as production
+

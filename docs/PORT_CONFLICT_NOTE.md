@@ -65,3 +65,4 @@ export DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/france_renova
 alembic revision --autogenerate -m "Initial schema"
 alembic upgrade head
 ```
+

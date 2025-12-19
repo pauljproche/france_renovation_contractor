@@ -232,14 +232,14 @@ Before starting:
    CREATE TABLE approvals (
        id SERIAL PRIMARY KEY,
        item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-       role VARCHAR(50) NOT NULL,  -- 'client' or 'cray'
+       role VARCHAR(20) NOT NULL,  -- 'client' or 'contractor'
        status VARCHAR(50),  -- 'approved', 'rejected', 'change_order', 'pending', 'supplied_by', null
        note TEXT,
        validated_at TIMESTAMP WITH TIME ZONE,
        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
        UNIQUE(item_id, role),  -- One approval per role per item
-       CONSTRAINT approvals_role_valid CHECK (role IN ('client', 'cray')),
+       CONSTRAINT approvals_role_valid CHECK (role IN ('client', 'contractor')),
        CONSTRAINT approvals_status_valid CHECK (
            status IS NULL OR status IN ('approved', 'rejected', 'change_order', 'pending', 'supplied_by')
        )
@@ -275,7 +275,7 @@ Before starting:
    CREATE TABLE comments (
        id SERIAL PRIMARY KEY,
        item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-       role VARCHAR(50) NOT NULL,  -- 'client' or 'cray'
+       role VARCHAR(20) NOT NULL,  -- 'client' or 'contractor'
        comment_text TEXT,
        created_at TIMESTAMP DEFAULT NOW(),
        updated_at TIMESTAMP DEFAULT NOW(),
@@ -316,7 +316,6 @@ Before starting:
        address VARCHAR(255),
        client_name VARCHAR(255),
        status VARCHAR(50) DEFAULT 'draft',  -- 'draft', 'ready', 'active', 'completed', 'archived'
-       devis_status VARCHAR(50),  -- 'sent', 'approved', 'rejected', null
        invoice_count INTEGER DEFAULT 0 CHECK (invoice_count >= 0),
        percentage_paid INTEGER DEFAULT 0 CHECK (percentage_paid >= 0 AND percentage_paid <= 100),
        start_date TIMESTAMP WITH TIME ZONE,
@@ -328,9 +327,6 @@ Before starting:
        CONSTRAINT projects_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
        CONSTRAINT projects_name_length CHECK (LENGTH(name) > 0 AND LENGTH(name) <= 255),
        CONSTRAINT projects_status_valid CHECK (status IN ('draft', 'ready', 'active', 'completed', 'archived')),
-       CONSTRAINT projects_devis_status_valid CHECK (
-           devis_status IS NULL OR devis_status IN ('sent', 'approved', 'rejected')
-       ),
        CONSTRAINT projects_date_range_valid CHECK (
            start_date IS NULL OR end_date IS NULL OR start_date <= end_date
        )
@@ -1730,6 +1726,7 @@ const updateProject = async (id, updates) => {
 4. Proceed phase by phase
 5. Test thoroughly after each phase
 6. Document any deviations from plan
+
 
 
 

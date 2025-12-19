@@ -60,3 +60,4 @@ def db_readonly_session():
         raise
     finally:
         session.close()
+
