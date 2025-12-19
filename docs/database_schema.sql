@@ -129,7 +129,7 @@ CREATE TABLE projects (
     address VARCHAR(255),
     contractor_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Contractor managing this project
     client_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Client owning this project
-    client_name VARCHAR(255),  -- Denormalized for backward compatibility (can be derived from client_id)
+    client_name VARCHAR(255),  -- REDUNDANT: Can be derived from client_id → users (kept for migration compatibility only)
     status project_status_enum DEFAULT 'draft' NOT NULL,
     devis_status devis_status_enum,  -- NULL allowed (no devis yet)
     invoice_count INTEGER DEFAULT 0 NOT NULL,
@@ -315,6 +315,10 @@ CREATE TABLE orders (
     
     -- Constraints
     CONSTRAINT orders_quantity_valid CHECK (quantity IS NULL OR quantity > 0),
+    CONSTRAINT orders_ordered_with_date CHECK (
+        (ordered = FALSE AND order_date IS NULL) OR 
+        (ordered = TRUE AND order_date IS NOT NULL)
+    ),  -- If ordered=true, order_date must be set
     CONSTRAINT orders_date_format CHECK (
         (order_date IS NULL OR order_date ~ '^\d{2}/\d{2}$') AND
         (delivery_date IS NULL OR delivery_date ~ '^\d{2}/\d{2}$')
