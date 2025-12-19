@@ -27,7 +27,22 @@ The database schema supports all these domains with normalized, relational table
 
 ## Core Tables
 
-The schema consists of **11 tables** organized into three main domains:
+The schema consists of **12 tables** organized into four main domains:
+
+### 🔐 **Authentication & Access Control Domain** (1 table)
+
+#### `users`
+**Purpose**: User accounts for authentication and authorization
+
+**Key Fields**:
+- `id`, `email`, `password_hash` - Authentication credentials
+- `role` - User type: `'contractor'`, `'client'`, `'worker'`, `'subcontractor'`
+- `zulip_user_id` - Links to Zulip bot integration (nullable)
+- `last_login` - Track user activity
+
+**Why Critical?**: Enables multi-user access control. Contractors, clients, and workers can log in. Projects link to users via `contractor_id` and `client_id`. Workers can optionally link their accounts via `user_id`.
+
+---
 
 ### 🏗️ **Project Management Domain** (3 tables)
 
@@ -35,13 +50,21 @@ The schema consists of **11 tables** organized into three main domains:
 **Purpose**: Master table for all renovation projects/chantiers
 
 **Key Fields**:
-- `id`, `name`, `address`, `client_name` - Project identification
-- `status` - Lifecycle state: `draft`, `ready`, `active`, `completed`, `archived`
-- `devis_status` - Quote/devis approval: `sent`, `approved`, `rejected`
+- `id`, `name`, `address` - Project identification
+- `contractor_id` → references `users(id)` - Contractor managing this project
+- `client_id` → references `users(id)` - Client owning this project
+- `client_name` - **REDUNDANT**: Derivable from `client_id` (kept for migration compatibility)
+- `status` - Lifecycle state: `'draft'`, `'ready'`, `'active'`, `'completed'`, `'archived'` (enum)
+- `devis_status` - Quote/devis approval: `'sent'`, `'approved'`, `'rejected'` (enum, nullable)
 - `start_date`, `end_date` - Project timeline (with validation: start ≤ end)
 - `invoice_count`, `percentage_paid` - Financial tracking
 
 **Why Core?**: Everything revolves around projects. Materials belong to projects. Workers are assigned to projects. This is the root of the hierarchy.
+
+**Access Control**: The `contractor_id` and `client_id` foreign keys enable role-based access:
+- Contractors see all projects they manage
+- Clients see only their own projects
+- Queries filter by `contractor_id` or `client_id` based on logged-in user
 
 ---
 
@@ -50,9 +73,12 @@ The schema consists of **11 tables** organized into three main domains:
 
 **Key Fields**:
 - `id`, `name`, `email`, `phone` - Contact information
+- `user_id` → references `users(id)` (nullable) - Optional link to user account
 - Timestamps for tracking creation/updates
 
 **Why Core?**: Workers are independent entities that can be assigned to multiple projects over time.
+
+**Design Note**: `user_id` is nullable because not all workers need user accounts. Workers who log in (e.g., to check their schedule via Zulip bot) have a `user_id`. Workers managed by contractors but who don't log in have `user_id = NULL`. The `email` field is kept because some workers won't have accounts but still need contact info.
 
 ---
 
@@ -94,7 +120,8 @@ The schema consists of **11 tables** organized into three main domains:
 - `section_id` → references `sections(id)` (CASCADE)
 - `product` - Product name/description (TEXT for long descriptions)
 - `reference`, `supplier_link` - Procurement information
-- `labor_type` - Type of labor required (e.g., "Démolition & Dépose")
+- `labor_type` - Type of labor required using `work_type_enum`: `'demolition'`, `'plumbing'`, `'electrical'`, etc.
+  - **Note**: Uses centralized `work_type_enum` shared with `worker_jobs.job_type` for consistency
 - `price_ttc`, `price_ht_quote` - Pricing (TTC = with tax, HT = without tax quote)
 - `UNIQUE(section_id, product)` - Prevents duplicate products in same section
 
@@ -107,8 +134,8 @@ The schema consists of **11 tables** organized into three main domains:
 
 **Key Fields**:
 - `item_id` → references `items(id)` (CASCADE)
-- `role` - `'client'` or `'cray'` (contractor)
-- `status` - `'approved'`, `'rejected'`, `'change_order'`, `'pending'`, `'supplied_by'`, or `NULL`
+- `role` - `'client'` or `'cray'` (contractor) - VARCHAR with CHECK constraint
+- `status` - Approval status enum: `'approved'`, `'rejected'`, `'change_order'`, `'pending'`, `'supplied_by'`, or `NULL`
 - `note`, `validated_at` - Approval metadata
 - `UNIQUE(item_id, role)` - One approval record per role per item
 
@@ -165,7 +192,11 @@ PostgreSQL arrays could work, but a separate table enables:
 - `item_id` → references `items(id)` (CASCADE, UNIQUE - one order per item)
 - `ordered` - Boolean flag
 - `order_date`, `delivery_date` - Dates in `'dd/mm'` format (with regex validation)
-- `delivery_status`, `quantity`
+- `delivery_status` - Delivery status enum: `'pending'`, `'ordered'`, `'shipped'`, `'delivered'`, `'cancelled'`
+- `quantity` - Order quantity (must be positive if set)
+
+**Constraints**:
+- `orders_ordered_with_date`: If `ordered = TRUE`, then `order_date` must be set (logical requirement)
 
 **Why Separate?**: Order information is independent of approvals. An item can be approved but not yet ordered, or ordered but pending approval. Separation allows:
 - Independent lifecycle tracking
@@ -192,12 +223,19 @@ PostgreSQL arrays could work, but a separate table enables:
 
 **Key Fields**:
 - `item_id` → references `items(id)` (SET NULL on delete - preserves history)
+- `user_id` → references `users(id)` (SET NULL, nullable) - **Who made the change** (audit trail)
+- `section_id`, `section_label`, `product` - Denormalized fields (preserved even if item deleted)
 - `field_path` - Which field changed (e.g., `'price_ttc'`, `'approvals.client.status'`)
 - `old_value`, `new_value` - Stored as JSONB for flexibility
-- `source` - `'manual'` or `'agent'` (tracks if change came from AI/LLM)
+- `source` - `'manual'` or `'agent'` (tracks if change came from AI/LLM, VARCHAR with CHECK)
 - `timestamp` - When the change occurred
 
 **Why Critical?**: Provides full auditability. Even if an item is deleted, its edit history is preserved (`SET NULL` on `item_id`). JSONB allows storing complex nested values without schema changes.
+
+**Audit Features**: 
+- `user_id` tracks **who** made the change (for accountability)
+- `source` tracks **how** the change was made (manual vs agent/AI)
+- Denormalized fields (`section_id`, `section_label`, `product`) preserve context even after item deletion
 
 **Security Note**: The `source` field helps track AI/agent modifications for security monitoring.
 
@@ -213,6 +251,31 @@ PostgreSQL arrays could work, but a separate table enables:
 - `UNIQUE(item_id, field_name)`
 
 **Why Important?**: Future-proofs the schema. If new requirements emerge (e.g., "warranty_period", "eco_label", "installation_notes"), they can be added as custom fields without migrations. JSONB allows storing structured data (objects, arrays) as values.
+
+---
+
+## Enums & Type System
+
+The schema uses PostgreSQL enums for user-facing choices and multi-value fields:
+
+### **Centralized Work Type Enum**
+- **`work_type_enum`**: Used by both `items.labor_type` and `worker_jobs.job_type`
+  - Values: `'demolition'`, `'structural'`, `'facade'`, `'exterior_joinery'`, `'plastering'`, `'plumbing'`, `'electrical'`, `'wall_covering'`, `'interior_joinery'`, `'kitchen'`, `'landscaping'`, `'price_revision'`
+  - **Rationale**: Single source of truth for work types. Enables queries like "all plumbing-related work (materials + worker jobs)"
+  - Frontend translates enum values (English) to display names (French)
+
+### **Status & Role Enums**
+- **`project_status_enum`**: `'draft'`, `'ready'`, `'active'`, `'completed'`, `'archived'`
+- **`devis_status_enum`**: `'sent'`, `'approved'`, `'rejected'`
+- **`approval_status_enum`**: `'approved'`, `'rejected'`, `'change_order'`, `'pending'`, `'supplied_by'`
+- **`delivery_status_enum`**: `'pending'`, `'ordered'`, `'shipped'`, `'delivered'`, `'cancelled'`
+- **`user_role_enum`**: `'contractor'`, `'client'`, `'worker'`, `'subcontractor'`
+
+### **Simple VARCHAR + CHECK (2-value fields)**
+- **`approvals.role` / `comments.role`**: VARCHAR(10) CHECK (`'client'`, `'cray'`)
+- **`edit_history.source`**: VARCHAR(10) CHECK (`'manual'`, `'agent'`)
+
+**Design Philosophy**: Use enums for user selections and multi-value filters (better indexes, type safety). Use VARCHAR + CHECK for simple 2-value internal fields (simpler, still validated).
 
 ---
 
@@ -255,13 +318,20 @@ The primary migration goal is **ACID transactions** ("all or nothing"). The sche
 
 ### 3. **Security by Design**
 - **Agent Restrictions**: The schema is designed for a restricted `agent_user` role that can only execute SQL functions (no direct table writes)
-- **Audit Trail**: `edit_history` captures all changes with source tracking
-- **Validation**: Check constraints prevent invalid states (negative prices, invalid statuses, date ranges)
+- **Audit Trail**: `edit_history` captures all changes with `user_id` (who) and `source` (how) tracking
+- **User Authentication**: `users` table enables role-based access control (contractors see their projects, clients see theirs)
+- **Validation**: Check constraints and enums prevent invalid states (negative prices, invalid statuses, date ranges)
 
-### 4. **Flexibility Where Needed**
+### 4. **Access Control & User Management**
+- **Users Table**: Centralized authentication for contractors, clients, and workers
+- **Project Ownership**: `projects.contractor_id` and `projects.client_id` enable access control
+- **Worker Accounts**: `workers.user_id` links workers to accounts (optional - some workers don't log in)
+- **Zulip Integration**: `users.zulip_user_id` links user accounts to Zulip for bot integration
+
+### 5. **Flexibility Where Needed**
 - **JSONB Fields**: `edit_history.old_value/new_value` and `custom_fields.field_value` use JSONB for schema-less flexibility
-- **Optional Foreign Keys**: `edit_history.item_id` uses `SET NULL` to preserve audit trail even after item deletion
-- **String References**: `worker_jobs.chantier_name` uses a string link rather than strict FK for flexibility
+- **Optional Foreign Keys**: `edit_history.item_id` and `edit_history.user_id` use `SET NULL` to preserve audit trail even after item/user deletion
+- **Denormalization**: `projects.client_name` kept temporarily for migration compatibility (redundant but necessary during transition)
 
 ---
 
@@ -294,8 +364,11 @@ The primary migration goal is **ACID transactions** ("all or nothing"). The sche
 | `replacementUrls` array | `replacement_urls` table (one row per URL) | Query URLs across all approvals, add metadata later |
 | Single `items` array in JSON | `sections` + `items` tables | Query items across sections, efficient filtering |
 | No project-material link | `sections.project_id` FK | Link materials to projects, CASCADE deletes |
-| localStorage projects | `projects` table | Centralized storage, timeline queries |
+| localStorage projects | `projects` table + `users` FKs | Centralized storage, timeline queries, access control |
 | localStorage workers | `workers` + `worker_jobs` tables | Query worker assignments by date, multiple projects |
+| String `chantier_name` reference | `worker_jobs.project_id` FK | Referential integrity, direct JOINs, no typos |
+| No user authentication | `users` table | Multi-user support, role-based access, Zulip integration |
+| Separate `labor_type` and `job_type` | Centralized `work_type_enum` | Single source of truth, consistent queries |
 
 ### **Performance Considerations**
 
@@ -312,12 +385,17 @@ The primary migration goal is **ACID transactions** ("all or nothing"). The sche
 
 ### **Data Integrity**
 
+**Enums (Type Safety)**:
+- `project_status_enum`, `devis_status_enum`, `approval_status_enum`, `delivery_status_enum`, `user_role_enum`, `work_type_enum`
+- Database enforces valid values, better indexes, cleaner queries
+
 **Check Constraints**:
 - `projects_date_range_valid`: `start_date <= end_date` (prevents invalid timelines)
 - `items_price_ttc_valid`: Prices cannot be negative
 - `orders_date_format`: Dates must match `'dd/mm'` regex pattern
-- `approvals_role_valid`: Role must be `'client'` or `'cray'`
-- `projects_status_valid`: Status must be from allowed enum
+- `orders_ordered_with_date`: If `ordered = TRUE`, then `order_date` must be set (logical requirement)
+- `approvals.role` CHECK: Role must be `'client'` or `'cray'`
+- `edit_history.source` CHECK: Source must be `'manual'` or `'agent'`
 
 **Unique Constraints**:
 - `uq_items_section_product`: Prevents duplicate products in same section
@@ -327,11 +405,17 @@ The primary migration goal is **ACID transactions** ("all or nothing"). The sche
 
 **Foreign Keys with CASCADE**:
 - Delete project → deletes sections → deletes items → deletes all related data
+- Delete project → deletes worker_jobs (direct FK)
 - Delete item → deletes approvals, orders, comments, custom_fields
 - Delete approval → deletes replacement_urls
 - Delete worker → deletes worker_jobs
 
-**Exception**: `edit_history.item_id` uses `SET NULL` (not CASCADE) to preserve audit trail even after item deletion.
+**Foreign Keys with SET NULL** (preserve data, remove linkage):
+- Delete user → SET NULL on `projects.contractor_id`, `projects.client_id`, `workers.user_id`, `edit_history.user_id`
+- Delete item → SET NULL on `edit_history.item_id` (preserves audit trail)
+- Delete user → SET NULL on `edit_history.user_id` (preserves audit trail, loses user link)
+
+**Rationale**: SET NULL preserves data integrity while removing user/item linkages. Critical for audit trail - we want to know "what changed" even if the item/user is deleted.
 
 ---
 
@@ -367,10 +451,11 @@ Every item can have:
 
 ```
 workers (1) ──< (N) worker_jobs
-worker_jobs.chantier_name → projects.address (logical link, not FK)
+projects (1) ──< (N) worker_jobs (direct FK)
+users (1) ──< (0 or 1) workers.user_id (nullable, SET NULL)
 ```
 
-Workers can have multiple job assignments. Each job references a project by name/address.
+Workers can have multiple job assignments. Each job has a **direct foreign key** to `projects` for referential integrity. Workers can optionally link to user accounts for login access.
 
 ### **Query Patterns Enabled**
 
@@ -383,7 +468,9 @@ Workers can have multiple job assignments. Each job references a project by name
 
 2. **"Worker timeline for March 2025"**
    ```sql
-   SELECT wj.* FROM worker_jobs wj
+   SELECT wj.*, p.name as project_name
+   FROM worker_jobs wj
+   JOIN projects p ON p.id = wj.project_id  -- Direct JOIN now possible
    WHERE wj.worker_id = 'john_doe'
      AND wj.start_date >= '2025-03-01'
      AND (wj.end_date IS NULL OR wj.end_date <= '2025-03-31');
@@ -406,6 +493,32 @@ Workers can have multiple job assignments. Each job references a project by name
    LEFT JOIN items i ON i.section_id = s.id
    WHERE p.id = 'project_123'
    GROUP BY p.id, p.name;
+   ```
+
+5. **"All projects for a contractor"** (Access Control)
+   ```sql
+   SELECT p.* FROM projects p
+   WHERE p.contractor_id = 'user_contractor_123';
+   ```
+
+6. **"All plumbing-related work (materials + jobs)"** (Centralized work_type)
+   ```sql
+   SELECT 'material' as type, i.product, i.labor_type as work_type
+   FROM items i
+   WHERE i.labor_type = 'plumbing'
+   UNION ALL
+   SELECT 'worker_job' as type, wj.id, wj.job_type as work_type
+   FROM worker_jobs wj
+   WHERE wj.job_type = 'plumbing';
+   ```
+
+7. **"Who changed this item?"** (Audit Trail)
+   ```sql
+   SELECT eh.*, u.email as changed_by_email
+   FROM edit_history eh
+   LEFT JOIN users u ON u.id = eh.user_id
+   WHERE eh.item_id = 123
+   ORDER BY eh.timestamp DESC;
    ```
 
 ---
@@ -477,17 +590,21 @@ Workers can have multiple job assignments. Each job references a project by name
 
 ### **Normalized Result**
 
-- `projects` table ← localStorage projects
+**New Tables:**
+- `users` table ← New (authentication & access control)
+- `custom_fields` table ← New (for future extensibility)
+
+**Migrated Tables:**
+- `projects` table ← localStorage projects (now with `contractor_id`, `client_id` FKs)
 - `sections` table ← JSON sections
-- `items` table ← JSON items
-- `approvals` table ← JSON items.approvals (normalized by role)
+- `items` table ← JSON items (now with `work_type_enum` for `labor_type`)
+- `approvals` table ← JSON items.approvals (normalized by role, now with enum status)
 - `replacement_urls` table ← JSON items.approvals[role].replacementUrls (array → table)
-- `orders` table ← JSON items.order
+- `orders` table ← JSON items.order (now with enum `delivery_status`)
 - `comments` table ← JSON items.comments (normalized by role)
-- `workers` table ← localStorage workers
-- `worker_jobs` table ← localStorage workers[].jobs (array → table)
-- `edit_history` table ← `data/edit-history.json` (if applicable)
-- `custom_fields` table ← new (for future extensibility)
+- `workers` table ← localStorage workers (now with optional `user_id` FK)
+- `worker_jobs` table ← localStorage workers[].jobs (now with `project_id` FK instead of `chantier_name`, uses `work_type_enum`)
+- `edit_history` table ← `data/edit-history.json` (now with `user_id` FK for audit trail)
 
 ---
 
@@ -515,11 +632,16 @@ Workers can have multiple job assignments. Each job references a project by name
 - **Future**: Could migrate to `DATE` with year tracking, but VARCHAR matches current frontend format.
 - **Validation**: Regex check ensures format is `'^\d{2}/\d{2}$'`.
 
-### 5. **Why `worker_jobs.chantier_name` Instead of `project_id` FK?**
+### 5. **Why `worker_jobs.project_id` FK (Changed from `chantier_name`)?**
 
-- **Rationale**: Worker assignments might reference projects by name/address before project IDs are finalized. Also allows linking to external projects not in the system.
-- **Trade-off**: No referential integrity (could have typo in name), but provides flexibility.
-- **Future**: Could add `project_id` FK as optional column for strict linking when project exists.
+- **Updated Design**: Now uses **direct foreign key** `project_id` instead of string `chantier_name`
+- **Rationale**: 
+  - Better referential integrity (no orphaned jobs)
+  - Direct JOINs without string matching
+  - Prevents typos/mismatches
+  - CASCADE deletes (removing project removes related jobs)
+  - Better normalization
+- **Migration**: When migrating data, map `chantier` string to corresponding `project_id` in database
 
 ### 6. **Why `edit_history.item_id` Uses SET NULL (Not CASCADE)?**
 
@@ -531,9 +653,37 @@ Workers can have multiple job assignments. Each job references a project by name
 - **Rationale**: Custom fields are schema-less. One field might be a string, another an object, another an array. JSONB allows storing any structure.
 - **Benefit**: Can query JSONB with PostgreSQL operators (`->`, `->>`, `@>`), but flexible enough for future requirements.
 
-### 8. **Why So Many Indexes?**
+### 8. **Why Centralized `work_type_enum` for Both Materials and Jobs?**
 
-- **Rationale**: Every foreign key has an index (best practice for JOIN performance). Composite indexes support common query patterns (item+role, dates).
+- **Rationale**: Both `items.labor_type` and `worker_jobs.job_type` describe the same concept (type of work). Using a single enum:
+  - Single source of truth
+  - Enables queries like "all plumbing-related work (materials + workers)"
+  - Consistent data across the system
+  - Frontend can translate enum values (English) to display names (French)
+- **Values**: English, simple, programmatic (e.g., `'plumbing'`, `'electrical'`)
+- **Display**: Frontend translations convert to French (e.g., `'plumbing'` → `'Plomberie & CVC'`)
+
+### 9. **Why Enums Instead of VARCHAR + CHECK for Status Fields?**
+
+- **Rationale**: Status fields that users select or filter by benefit from enums:
+  - Type safety (database enforces valid values)
+  - Better indexes (more efficient than VARCHAR)
+  - Cleaner queries (enum comparison vs string matching)
+  - Easy to add values: `ALTER TYPE ... ADD VALUE`
+- **Exception**: 2-value internal fields (`approvals.role`, `edit_history.source`) use VARCHAR + CHECK for simplicity
+
+### 10. **Why `projects.client_name` is Redundant but Kept?**
+
+- **Redundancy**: Can be derived from `client_id → users` (name/email)
+- **Rationale**: Kept temporarily for **migration compatibility**
+  - Existing data might reference client by name
+  - During migration, can populate `client_id` from `client_name`
+  - Post-migration: Can be removed or kept only for legacy projects without `client_id`
+- **Trade-off**: Acceptable temporary redundancy to ease migration
+
+### 11. **Why So Many Indexes?**
+
+- **Rationale**: Every foreign key has an index (best practice for JOIN performance). Composite indexes support common query patterns (item+role, dates). Enum indexes are more efficient than VARCHAR indexes.
 - **Trade-off**: Slightly slower INSERTs/UPDATEs, but dramatically faster SELECTs. For a read-heavy application, this is optimal.
 
 ---
@@ -543,14 +693,23 @@ Workers can have multiple job assignments. Each job references a project by name
 This schema transforms a nested JSON/localStorage data structure into a normalized, relational database that provides:
 
 ✅ **ACID transactions** - All-or-nothing operations  
-✅ **Data integrity** - Constraints and foreign keys prevent invalid states  
+✅ **Data integrity** - Constraints, enums, and foreign keys prevent invalid states  
 ✅ **Query flexibility** - SQL enables any query pattern  
-✅ **Audit trail** - Complete history of all changes  
+✅ **Access control** - User authentication and role-based project access  
+✅ **Audit trail** - Complete history of all changes with user tracking  
+✅ **Centralized types** - `work_type_enum` shared across materials and jobs for consistency  
 ✅ **Scalability** - Indexes and normalization support growth  
 ✅ **Security** - Designed for restricted agent access via SQL functions  
 ✅ **Extensibility** - Custom fields and flexible JSONB where needed  
+✅ **Type safety** - Enums for user selections, CHECK constraints for validation  
 
-The design balances normalization (for integrity and queryability) with flexibility (JSONB, string references) where strict relational rules would be too rigid.
+The design balances normalization (for integrity and queryability) with flexibility (JSONB, denormalized fields for migration) where strict relational rules would be too rigid.
+
+**Schema Statistics:**
+- **12 tables**: users, projects, workers, worker_jobs, sections, items, approvals, replacement_urls, orders, comments, edit_history, custom_fields
+- **6 enums**: work_type_enum, project_status_enum, devis_status_enum, approval_status_enum, delivery_status_enum, user_role_enum
+- **All foreign keys indexed** for optimal JOIN performance
+- **Referential integrity** throughout with appropriate CASCADE/SET NULL rules
 
 ---
 
