@@ -405,10 +405,11 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 -- ============================================================================
 -- 
 -- Authentication & Access:
---   users (1) ──< (0 or N) projects.contractor_id (SET NULL on delete)
---   users (1) ──< (0 or N) projects.client_id (SET NULL on delete)
+--   users (1) ──< (0 or N) projects.owner_id (SET NULL on delete)
+--   users (1) ──< (0 or N) project_members (many-to-many with role)
 --   users (1) ──< (0 or 1) workers.user_id (SET NULL on delete, nullable)
 --   users (1) ──< (0 or N) edit_history.user_id (SET NULL on delete, nullable)
+--   projects (1) ──< (N) project_members (CASCADE delete)
 -- 
 -- Core Hierarchy:
 --   projects (1) ──< (N) sections (1) ──< (N) items
@@ -426,10 +427,12 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 -- 
 -- CASCADE Rules:
 --   - Deleting a project → deletes all sections → deletes all items → cascades through
+--   - Deleting a project → deletes project_members (CASCADE)
 --   - Deleting an item → deletes approvals, orders, comments, custom_fields
 --   - Deleting an approval → deletes replacement_urls
 --   - Deleting a worker → deletes all worker_jobs
+--   - Deleting a user → deletes project_members (CASCADE)
 --   - edit_history.item_id → SET NULL (preserves audit trail)
---   - Deleting a user → SET NULL on projects (contractor_id/client_id), workers.user_id, edit_history.user_id
+--   - Deleting a user → SET NULL on projects.owner_id, workers.user_id, edit_history.user_id
 --     (preserves data, just removes user linkage)
 -- ============================================================================
