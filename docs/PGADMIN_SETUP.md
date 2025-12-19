@@ -97,3 +97,4 @@ Password: postgres
 **Wrong password?**
 - Default password is `postgres`
 - To reset: `docker exec -it france-renovation-db psql -U postgres -c "ALTER USER postgres PASSWORD 'newpassword';"`
+

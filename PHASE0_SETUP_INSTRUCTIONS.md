@@ -74,3 +74,4 @@ psql -h localhost -U postgres -d france_renovation -c "SELECT version();"
 - [ ] Database connection verified
 
 **Once all checkboxes are complete, Phase 0 is done and ready for Phase 1!**
+

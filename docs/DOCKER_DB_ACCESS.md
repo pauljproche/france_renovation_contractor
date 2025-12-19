@@ -134,3 +134,4 @@ docker exec france-renovation-db pg_dump -U postgres france_renovation > backup.
 ```bash
 docker exec -i france-renovation-db psql -U postgres -d france_renovation < backup.sql
 ```
+
