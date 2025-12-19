@@ -54,11 +54,13 @@ CREATE TYPE project_status_enum AS ENUM (
     'archived'
 );
 
--- Devis status enum: Quote/devis approval status
-CREATE TYPE devis_status_enum AS ENUM (
+-- Quote status enum: Quote approval status
+CREATE TYPE quote_status_enum AS ENUM (
+    'draft',
     'sent',
     'approved',
-    'rejected'
+    'rejected',
+    'superseded'  -- Replaced by a newer quote version
 );
 
 -- Approval status enum: Status of item approvals
@@ -128,7 +130,6 @@ CREATE TABLE projects (
     address VARCHAR(255),
     owner_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE RESTRICT,  -- Primary owner/contractor who created/manages this project (required, prevents orphaned projects)
     status project_status_enum DEFAULT 'draft' NOT NULL,
-    devis_status devis_status_enum,  -- NULL allowed (no devis yet)
     invoice_count INTEGER DEFAULT 0 NOT NULL,
     percentage_paid INTEGER DEFAULT 0 NOT NULL,
     start_date TIMESTAMP WITH TIME ZONE,
@@ -185,6 +186,42 @@ CREATE INDEX idx_project_members_project ON project_members(project_id);
 CREATE INDEX idx_project_members_user ON project_members(user_id);
 CREATE INDEX idx_project_members_role ON project_members(role);
 CREATE INDEX idx_project_members_project_role ON project_members(project_id, role);  -- For queries like "all contractors on project X"
+
+
+-- ============================================================================
+-- QUOTES (Project Quotes/Devis)
+-- ============================================================================
+-- Stores quotes (devis) sent to clients for projects
+-- Multiple quotes per project supported (for revisions, updates, etc.)
+-- Initial quote is the itemized estimate/quote sent to client for approval
+-- ============================================================================
+CREATE TABLE quotes (
+    id VARCHAR(50) PRIMARY KEY,
+    project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    status quote_status_enum DEFAULT 'draft' NOT NULL,
+    version_number INTEGER DEFAULT 1 NOT NULL,  -- Version number for multiple quotes (1, 2, 3, etc.)
+    sent_at TIMESTAMP WITH TIME ZONE,  -- When quote was sent to client
+    approved_at TIMESTAMP WITH TIME ZONE,  -- When quote was approved
+    rejected_at TIMESTAMP WITH TIME ZONE,  -- When quote was rejected
+    notes TEXT,  -- Optional notes about this quote
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    
+    -- Constraints
+    CONSTRAINT quotes_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
+    CONSTRAINT quotes_version_positive CHECK (version_number > 0),
+    CONSTRAINT quotes_status_dates_consistent CHECK (
+        (status = 'draft' AND sent_at IS NULL) OR
+        (status IN ('sent', 'approved', 'rejected', 'superseded') AND sent_at IS NOT NULL) OR
+        (status = 'draft')
+    )
+);
+
+-- Indexes for quotes
+CREATE INDEX idx_quotes_project ON quotes(project_id);
+CREATE INDEX idx_quotes_status ON quotes(status);
+CREATE INDEX idx_quotes_project_status ON quotes(project_id, status);  -- For finding active quotes per project
+CREATE INDEX idx_quotes_created ON quotes(created_at DESC);
 
 
 -- ============================================================================
@@ -445,6 +482,7 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 --   projects (1) ──< (N) project_members (CASCADE delete)
 -- 
 -- Core Hierarchy:
+--   projects (1) ──< (N) quotes (multiple quotes per project, versioned)
 --   projects (1) ──< (N) sections (1) ──< (N) items
 --   
 -- Items Relationships:
@@ -459,6 +497,7 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 --   projects (1) ──< (N) worker_jobs (direct FK)
 -- 
 -- CASCADE Rules:
+--   - Deleting a project → deletes all quotes (CASCADE)
 --   - Deleting a project → deletes all sections → deletes all items → cascades through
 --   - Deleting a project → deletes project_members (CASCADE)
 --   - Deleting an item → deletes approvals, orders, comments, custom_fields
