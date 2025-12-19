@@ -43,6 +43,52 @@ CREATE TYPE work_type_enum AS ENUM (
     'price_revision'
 );
 
+-- Approval role enum: Used in approvals and comments tables
+CREATE TYPE approval_role_enum AS ENUM (
+    'client',
+    'cray'
+);
+
+-- Project status enum: Lifecycle status of projects
+CREATE TYPE project_status_enum AS ENUM (
+    'draft',
+    'ready',
+    'active',
+    'completed',
+    'archived'
+);
+
+-- Devis status enum: Quote/devis approval status
+CREATE TYPE devis_status_enum AS ENUM (
+    'sent',
+    'approved',
+    'rejected'
+);
+
+-- Approval status enum: Status of item approvals
+CREATE TYPE approval_status_enum AS ENUM (
+    'approved',
+    'rejected',
+    'change_order',
+    'pending',
+    'supplied_by'
+);
+
+-- Edit source enum: Source of edit (manual vs agent/AI)
+CREATE TYPE edit_source_enum AS ENUM (
+    'manual',
+    'agent'
+);
+
+-- Delivery status enum: Status of item delivery
+CREATE TYPE delivery_status_enum AS ENUM (
+    'pending',
+    'ordered',
+    'shipped',
+    'delivered',
+    'cancelled'
+);
+
 -- ============================================================================
 -- USERS (Authentication & Access Control)
 -- ============================================================================
@@ -90,8 +136,8 @@ CREATE TABLE projects (
     contractor_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Contractor managing this project
     client_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Client owning this project
     client_name VARCHAR(255),  -- Denormalized for backward compatibility (can be derived from client_id)
-    status VARCHAR(50) DEFAULT 'draft' NOT NULL,  -- 'draft', 'ready', 'active', 'completed', 'archived'
-    devis_status VARCHAR(50),  -- 'sent', 'approved', 'rejected', NULL
+    status project_status_enum DEFAULT 'draft' NOT NULL,
+    devis_status devis_status_enum,  -- NULL allowed (no devis yet)
     invoice_count INTEGER DEFAULT 0 NOT NULL,
     percentage_paid INTEGER DEFAULT 0 NOT NULL,
     start_date TIMESTAMP WITH TIME ZONE,
@@ -104,10 +150,6 @@ CREATE TABLE projects (
     -- Constraints
     CONSTRAINT projects_id_length CHECK (LENGTH(id) > 0 AND LENGTH(id) <= 50),
     CONSTRAINT projects_name_length CHECK (LENGTH(name) > 0 AND LENGTH(name) <= 255),
-    CONSTRAINT projects_status_valid CHECK (status IN ('draft', 'ready', 'active', 'completed', 'archived')),
-    CONSTRAINT projects_devis_status_valid CHECK (
-        devis_status IS NULL OR devis_status IN ('sent', 'approved', 'rejected')
-    ),
     CONSTRAINT projects_date_range_valid CHECK (
         start_date IS NULL OR end_date IS NULL OR start_date <= end_date
     ),
@@ -227,18 +269,14 @@ CREATE INDEX idx_items_labor_type ON items(labor_type);
 CREATE TABLE approvals (
     id SERIAL PRIMARY KEY,
     item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    role VARCHAR(50) NOT NULL,  -- 'client' or 'cray'
-    status VARCHAR(50),  -- 'approved', 'rejected', 'change_order', 'pending', 'supplied_by', NULL
+    role approval_role_enum NOT NULL,
+    status approval_status_enum,  -- NULL allowed (no status set yet)
     note TEXT,
     validated_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
-    CONSTRAINT approvals_role_valid CHECK (role IN ('client', 'cray')),
-    CONSTRAINT approvals_status_valid CHECK (
-        status IS NULL OR status IN ('approved', 'rejected', 'change_order', 'pending', 'supplied_by')
-    ),
     CONSTRAINT uq_approvals_item_role UNIQUE(item_id, role)  -- One approval per role per item
 );
 
@@ -274,9 +312,9 @@ CREATE TABLE orders (
     id SERIAL PRIMARY KEY,
     item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE UNIQUE,  -- One order per item
     ordered BOOLEAN DEFAULT FALSE NOT NULL,
-    order_date VARCHAR(10),  -- Format: 'dd/mm'
-    delivery_date VARCHAR(10),  -- Format: 'dd/mm'
-    delivery_status VARCHAR(50),
+    order_date VARCHAR(10),  -- Format: 'dd/mm' (kept as VARCHAR for frontend compatibility)
+    delivery_date VARCHAR(10),  -- Format: 'dd/mm' (kept as VARCHAR for frontend compatibility)
+    delivery_status delivery_status_enum,
     quantity INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
@@ -302,7 +340,7 @@ CREATE INDEX idx_orders_ordered ON orders(ordered);
 CREATE TABLE comments (
     id SERIAL PRIMARY KEY,
     item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-    role VARCHAR(50) NOT NULL,  -- 'client' or 'cray'
+    role approval_role_enum NOT NULL,  -- Uses same enum as approvals (client/cray)
     comment_text TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
@@ -330,11 +368,10 @@ CREATE TABLE edit_history (
     field_path VARCHAR(255) NOT NULL,  -- e.g., 'price_ttc', 'approvals.client.status'
     old_value JSONB,
     new_value JSONB,
-    source VARCHAR(50) DEFAULT 'manual' NOT NULL,  -- 'manual' or 'agent'
+    source edit_source_enum DEFAULT 'manual' NOT NULL,
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     
     -- Constraints
-    CONSTRAINT edit_history_source_valid CHECK (source IN ('manual', 'agent')),
     CONSTRAINT edit_history_field_path_length CHECK (LENGTH(field_path) > 0 AND LENGTH(field_path) <= 255)
 );
 
