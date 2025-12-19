@@ -22,6 +22,28 @@
 -- ============================================================================
 
 -- ============================================================================
+-- ENUMS
+-- ============================================================================
+-- Work type enum: Centralized work/job types used for both materials (labor_type)
+-- and worker assignments (job_type). Values are in English (simple, programmatic)
+-- and can be translated in the frontend UI.
+-- ============================================================================
+CREATE TYPE work_type_enum AS ENUM (
+    'demolition',
+    'structural',
+    'facade',
+    'exterior_joinery',
+    'plastering',
+    'plumbing',
+    'electrical',
+    'wall_covering',
+    'interior_joinery',
+    'kitchen',
+    'landscaping',
+    'price_revision'
+);
+
+-- ============================================================================
 -- PROJECTS (Core Entity)
 -- ============================================================================
 -- Stores renovation projects/chantiers
@@ -91,7 +113,7 @@ CREATE TABLE worker_jobs (
     id VARCHAR(50) PRIMARY KEY,
     worker_id VARCHAR(50) NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
     chantier_name VARCHAR(255) NOT NULL,  -- References project address/name
-    job_type VARCHAR(50),  -- 'plumbing', 'electrical', 'demo', etc.
+    job_type work_type_enum,  -- Type of work assigned (uses work_type_enum)
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
     end_date TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
@@ -102,6 +124,7 @@ CREATE TABLE worker_jobs (
 CREATE INDEX idx_worker_jobs_worker ON worker_jobs(worker_id);
 CREATE INDEX idx_worker_jobs_chantier ON worker_jobs(chantier_name);
 CREATE INDEX idx_worker_jobs_dates ON worker_jobs(start_date, end_date);
+CREATE INDEX idx_worker_jobs_type ON worker_jobs(job_type);
 
 
 -- ============================================================================
@@ -137,7 +160,7 @@ CREATE TABLE items (
     product TEXT NOT NULL,
     reference VARCHAR(255),
     supplier_link TEXT,
-    labor_type VARCHAR(50),
+    labor_type work_type_enum,  -- Type of work needed (uses work_type_enum)
     price_ttc NUMERIC(10, 2),
     price_ht_quote NUMERIC(10, 2),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
@@ -154,6 +177,7 @@ CREATE TABLE items (
 CREATE INDEX idx_items_section ON items(section_id);
 CREATE INDEX idx_items_product ON items(product);
 CREATE INDEX idx_items_updated ON items(updated_at DESC);
+CREATE INDEX idx_items_labor_type ON items(labor_type);
 
 
 -- ============================================================================
