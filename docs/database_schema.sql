@@ -189,23 +189,21 @@ CREATE INDEX idx_project_members_project_role ON project_members(project_id, rol
 
 
 -- ============================================================================
--- WORKERS (Core Entity)
+-- WORKERS (Worker-Specific Information)
 -- ============================================================================
--- Stores salaried workers information
+-- Stores worker-specific information (diplomas, certificates, etc.)
+-- One-to-one relationship with users: a worker IS a user with additional worker data
+-- Note: Basic info (name, email) comes from users table
 -- ============================================================================
 CREATE TABLE workers (
-    id VARCHAR(50) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255),
-    phone VARCHAR(50),
-    user_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,  -- Optional link to user account (for workers who log in)
+    user_id VARCHAR(50) PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,  -- PK = FK to users (one-to-one)
+    -- Worker-specific fields (diplomas, certificates, etc.) can be added here
+    -- For now, this table exists as a placeholder for future worker-specific attributes
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
--- Indexes for workers
-CREATE INDEX idx_workers_name ON workers(name);
-CREATE INDEX idx_workers_user ON workers(user_id) WHERE user_id IS NOT NULL;
+-- Note: No separate indexes needed - user_id is already indexed as PK
 
 
 -- ============================================================================
@@ -215,7 +213,7 @@ CREATE INDEX idx_workers_user ON workers(user_id) WHERE user_id IS NOT NULL;
 -- ============================================================================
 CREATE TABLE worker_jobs (
     id VARCHAR(50) PRIMARY KEY,
-    worker_id VARCHAR(50) NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    worker_id VARCHAR(50) NOT NULL REFERENCES workers(user_id) ON DELETE CASCADE,  -- References workers.user_id (which is also users.id)
     project_id VARCHAR(50) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,  -- Direct FK to project
     job_type work_type_enum,  -- Type of work assigned (uses work_type_enum)
     start_date TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -436,7 +434,7 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 -- Authentication & Access:
 --   users (1) ──< (1 or N) projects.owner_id (RESTRICT on delete - ensures at least one owner per project)
 --   users (1) ──< (0 or N) project_members (many-to-many with role, CASCADE delete)
---   users (1) ──< (0 or 1) workers.user_id (SET NULL on delete, nullable)
+--   users (1) ──< (0 or 1) workers (one-to-one, workers.user_id = PK = FK to users.id, CASCADE delete)
 --   users (1) ──< (0 or N) edit_history.user_id (SET NULL on delete, nullable)
 --   projects (1) ──< (N) project_members (CASCADE delete)
 -- 
@@ -459,10 +457,11 @@ CREATE INDEX idx_custom_fields_item ON custom_fields(item_id);
 --   - Deleting a project → deletes project_members (CASCADE)
 --   - Deleting an item → deletes approvals, orders, comments, custom_fields
 --   - Deleting an approval → deletes replacement_urls
---   - Deleting a worker → deletes all worker_jobs
+--   - Deleting a worker (user) → deletes workers row (CASCADE) → deletes all worker_jobs (CASCADE)
 --   - Deleting a user → deletes project_members (CASCADE)
+--   - Deleting a user → deletes workers row if user is a worker (CASCADE)
 --   - Deleting a user → RESTRICT if user is owner of any projects (prevents orphaned projects)
 --   - edit_history.item_id → SET NULL (preserves audit trail)
---   - Deleting a user → SET NULL on workers.user_id, edit_history.user_id
---     (preserves data, just removes user linkage, but NOT for projects.owner_id - RESTRICT applies)
+--   - Deleting a user → SET NULL on edit_history.user_id (preserves audit trail, just removes user linkage)
+--     (but NOT for projects.owner_id - RESTRICT applies, NOT for workers - CASCADE applies)
 -- ============================================================================
