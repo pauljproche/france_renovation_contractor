@@ -18,7 +18,7 @@
 1. **Renovation Projects (Chantiers)**: Track multiple construction projects with timelines, status, and financials
 2. **Materials & Procurement**: Manage materials, approvals, orders, and delivery for each project
 3. **Worker Management**: Assign workers to projects and track their job assignments over time
-4. **Approval Workflows**: Two-tier approval system (client + contractor "cray") for materials
+4. **Approval Workflows**: Two-tier approval system (client + contractor) for materials
 5. **Audit Trail**: Complete history of all changes to materials and approvals
 
 The database schema supports all these domains with normalized, relational tables that ensure data integrity and enable complex queries.
@@ -55,7 +55,7 @@ The schema consists of **12 tables** organized into four main domains:
 - `client_id` → references `users(id)` - Client owning this project
 - `client_name` - **REDUNDANT**: Derivable from `client_id` (kept for migration compatibility)
 - `status` - Lifecycle state: `'draft'`, `'ready'`, `'active'`, `'completed'`, `'archived'` (enum)
-- `devis_status` - Quote/devis approval: `'sent'`, `'approved'`, `'rejected'` (enum, nullable)
+- Quote status tracked in separate `quotes` table (supports multiple quotes per project)
 - `start_date`, `end_date` - Project timeline (with validation: start ≤ end)
 - `invoice_count`, `percentage_paid` - Financial tracking
 
@@ -130,11 +130,11 @@ The schema consists of **12 tables** organized into four main domains:
 ---
 
 #### `approvals`
-**Purpose**: Approval status tracking by role (client vs. contractor "cray")
+**Purpose**: Approval status tracking by role (client vs. contractor)
 
 **Key Fields**:
 - `item_id` → references `items(id)` (CASCADE)
-- `role` - `'client'` or `'cray'` (contractor) - VARCHAR with CHECK constraint
+- `role` - `'client'` or `'contractor'` - VARCHAR(20) with CHECK constraint
 - `status` - Approval status enum: `'approved'`, `'rejected'`, `'change_order'`, `'pending'`, `'supplied_by'`, or `NULL`
 - `note`, `validated_at` - Approval metadata
 - `UNIQUE(item_id, role)` - One approval record per role per item
@@ -144,7 +144,7 @@ The schema consists of **12 tables** organized into four main domains:
 {
   "approvals": {
     "client": { "status": "approved", ... },
-    "cray": { "status": "pending", ... }
+    "contractor": { "status": "pending", ... }
   }
 }
 ```
@@ -210,7 +210,7 @@ PostgreSQL arrays could work, but a separate table enables:
 
 **Key Fields**:
 - `item_id` → references `items(id)` (CASCADE)
-- `role` - `'client'` or `'cray'`
+- `role` - `'client'` or `'contractor'`
 - `comment_text` - Free-form text
 - `UNIQUE(item_id, role)` - One comment per role per item
 
@@ -266,13 +266,13 @@ The schema uses PostgreSQL enums for user-facing choices and multi-value fields:
 
 ### **Status & Role Enums**
 - **`project_status_enum`**: `'draft'`, `'ready'`, `'active'`, `'completed'`, `'archived'`
-- **`devis_status_enum`**: `'sent'`, `'approved'`, `'rejected'`
+- **`quote_status_enum`**: `'draft'`, `'sent'`, `'approved'`, `'rejected'`, `'superseded'` (in `quotes` table)
 - **`approval_status_enum`**: `'approved'`, `'rejected'`, `'change_order'`, `'pending'`, `'supplied_by'`
 - **`delivery_status_enum`**: `'pending'`, `'ordered'`, `'shipped'`, `'delivered'`, `'cancelled'`
 - **`user_role_enum`**: `'contractor'`, `'client'`, `'worker'`, `'subcontractor'`
 
 ### **Simple VARCHAR + CHECK (2-value fields)**
-- **`approvals.role` / `comments.role`**: VARCHAR(10) CHECK (`'client'`, `'cray'`)
+- **`approvals.role` / `comments.role`**: VARCHAR(20) CHECK (`'client'`, `'contractor'`)
 - **`edit_history.source`**: VARCHAR(10) CHECK (`'manual'`, `'agent'`)
 
 **Design Philosophy**: Use enums for user selections and multi-value filters (better indexes, type safety). Use VARCHAR + CHECK for simple 2-value internal fields (simpler, still validated).
@@ -386,7 +386,7 @@ The primary migration goal is **ACID transactions** ("all or nothing"). The sche
 ### **Data Integrity**
 
 **Enums (Type Safety)**:
-- `project_status_enum`, `devis_status_enum`, `approval_status_enum`, `delivery_status_enum`, `user_role_enum`, `work_type_enum`
+- `project_status_enum`, `quote_status_enum`, `approval_status_enum`, `delivery_status_enum`, `user_role_enum`, `work_type_enum`, `project_member_role_enum`
 - Database enforces valid values, better indexes, cleaner queries
 
 **Check Constraints**:
@@ -394,7 +394,7 @@ The primary migration goal is **ACID transactions** ("all or nothing"). The sche
 - `items_price_ttc_valid`: Prices cannot be negative
 - `orders_date_format`: Dates must match `'dd/mm'` regex pattern
 - `orders_ordered_with_date`: If `ordered = TRUE`, then `order_date` must be set (logical requirement)
-- `approvals.role` CHECK: Role must be `'client'` or `'cray'`
+- `approvals.role` CHECK: Role must be `'client'` or `'contractor'`
 - `edit_history.source` CHECK: Source must be `'manual'` or `'agent'`
 
 **Unique Constraints**:
@@ -440,7 +440,7 @@ items (1) ──< (N) edit_history
 ```
 
 Every item can have:
-- Multiple approvals (one per role: client, cray)
+- Multiple approvals (one per role: client, contractor)
 - Multiple replacement URLs (one per approval that has alternatives)
 - One order record
 - Multiple comments (one per role)
@@ -543,10 +543,10 @@ Workers can have multiple job assignments. Each job has a **direct foreign key**
               "status": "approved",
               "replacementUrls": ["url1", "url2"]
             },
-            "cray": { "status": "approved" }
+            "contractor": { "status": "approved" }
           },
           "order": { "ordered": true, "orderDate": "13/02" },
-          "comments": { "client": null, "cray": null }
+          "comments": { "client": null, "contractor": null }
         }
       ]
     }
@@ -706,8 +706,8 @@ This schema transforms a nested JSON/localStorage data structure into a normaliz
 The design balances normalization (for integrity and queryability) with flexibility (JSONB, denormalized fields for migration) where strict relational rules would be too rigid.
 
 **Schema Statistics:**
-- **12 tables**: users, projects, workers, worker_jobs, sections, items, approvals, replacement_urls, orders, comments, edit_history, custom_fields
-- **6 enums**: work_type_enum, project_status_enum, devis_status_enum, approval_status_enum, delivery_status_enum, user_role_enum
+- **14 tables**: users, projects, project_members, quotes, workers, worker_jobs, sections, items, approvals, replacement_urls, orders, comments, edit_history, custom_fields
+- **7 enums**: work_type_enum, project_status_enum, quote_status_enum, approval_status_enum, delivery_status_enum, user_role_enum, project_member_role_enum
 - **All foreign keys indexed** for optimal JOIN performance
 - **Referential integrity** throughout with appropriate CASCADE/SET NULL rules
 
