@@ -29,8 +29,8 @@ function App() {
           <AIPanelProvider>
             <ProjectsProvider>
               <WorkersProvider>
-                <ChatHistoryProvider>
-                  <CustomTableProvider>
+              <ChatHistoryProvider>
+                <CustomTableProvider>
                 <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<Login />} />
@@ -82,8 +82,8 @@ function App() {
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
-                  </CustomTableProvider>
-                </ChatHistoryProvider>
+                </CustomTableProvider>
+              </ChatHistoryProvider>
               </WorkersProvider>
             </ProjectsProvider>
           </AIPanelProvider>
