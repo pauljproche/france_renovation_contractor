@@ -21,7 +21,7 @@ from sqlalchemy import func
 from backend.database import SessionLocal
 from backend.models import (
     User, Project, ProjectMember, Quote, Worker, WorkerJob,
-    Section, Item, Approval, ReplacementUrl, Order, Comment, EditHistory
+    Section, Item, Approval, ReplacementURL, Order, Comment, EditHistory
 )
 
 # Paths
@@ -98,7 +98,7 @@ def validate_materials(session, materials_data):
                 urls = approval.get("replacementUrls", [])
                 json_replacement_url_count += len([u for u in urls if u])
     
-    db_replacement_url_count = session.query(ReplacementUrl).count()
+    db_replacement_url_count = session.query(ReplacementURL).count()
     
     if db_replacement_url_count != json_replacement_url_count:
         warnings.append(f"Replacement URL count mismatch: DB={db_replacement_url_count}, JSON={json_replacement_url_count}")
