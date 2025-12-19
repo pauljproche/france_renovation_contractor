@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 from backend.database import SessionLocal, engine
 from backend.models import (
     User, Project, ProjectMember, Quote, Worker, WorkerJob,
-    Section, Item, Approval, ReplacementUrl, Order, Comment, EditHistory,
+    Section, Item, Approval, ReplacementURL, Order, Comment, EditHistory,
     WorkTypeEnum, ApprovalStatusEnum, DeliveryStatusEnum, ProjectStatusEnum,
     QuoteStatusEnum, UserRoleEnum, ProjectMemberRoleEnum
 )
@@ -228,10 +228,16 @@ def migrate_materials(session: Session, materials_data: Dict, project_map: Dict[
         
         # Migrate items
         for item_data in section_data.get("items", []):
+            # Skip items with empty product (violates constraint)
+            product = item_data.get("product", "").strip()
+            if not product:
+                print(f"⚠️  Warning: Skipping item with empty product in section '{section_label}'")
+                continue
+            
             # Create item
             item = Item(
                 section_id=section_id,
-                product=item_data["product"],
+                product=product,
                 reference=item_data.get("reference"),
                 supplier_link=item_data.get("supplierLink"),
                 labor_type=map_labor_type_to_enum(item_data.get("laborType")),
@@ -272,7 +278,7 @@ def migrate_materials(session: Session, materials_data: Dict, project_map: Dict[
                         replacement_urls = approval_data.get("replacementUrls", [])
                         for url in replacement_urls:
                             if url:  # Only add non-empty URLs
-                                replacement_url = ReplacementUrl(
+                                replacement_url = ReplacementURL(
                                     approval_id=approval_id,
                                     url=url,
                                     created_at=datetime.utcnow()
