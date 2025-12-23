@@ -236,9 +236,11 @@ const TIMELINE_DEMO_PROJECTS = [
   },
 ];
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 export function ProjectsProvider({ children }) {
   const [projects, setProjects] = useState(() => {
-    // Load from localStorage on init
+    // Initial state: load from localStorage for immediate render
     const saved = localStorage.getItem('renovationProjects');
     if (saved) {
       try {
@@ -249,6 +251,8 @@ export function ProjectsProvider({ children }) {
     }
     return [];
   });
+
+  const [loading, setLoading] = useState(false);
 
   const [selectedProjectId, setSelectedProjectId] = useState(() => {
     // Load selected project from localStorage
@@ -283,6 +287,52 @@ export function ProjectsProvider({ children }) {
     return [];
   });
   
+  // Load projects from API on mount (with localStorage fallback)
+  useEffect(() => {
+    async function loadProjects() {
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/projects`);
+        if (response.ok) {
+          const data = await response.json();
+          const apiProjects = data.projects || [];
+          
+          // Merge with demo projects (hardcoded, not in DB)
+          // Demo projects are always included
+          setProjects(apiProjects);
+          
+          // Also save to localStorage for fallback
+          localStorage.setItem('renovationProjects', JSON.stringify(apiProjects));
+          
+          setLoading(false);
+          return;
+        } else if (response.status === 501) {
+          // Database not enabled - use localStorage fallback
+          console.log('API returned 501 - database not enabled, using localStorage');
+        }
+      } catch (error) {
+        // API not available or failed - use localStorage fallback
+        console.log('API call failed, using localStorage fallback:', error);
+      }
+      
+      // Fallback to localStorage
+      const saved = localStorage.getItem('renovationProjects');
+      if (saved) {
+        try {
+          const storedProjects = JSON.parse(saved);
+          setProjects(storedProjects);
+        } catch {
+          setProjects([]);
+        }
+      } else {
+        setProjects([]);
+      }
+      setLoading(false);
+    }
+
+    loadProjects();
+  }, []);
+
   // Watch for fresh logins and reset state accordingly
   // This runs on mount AND whenever localStorage is cleared (indicating new login)
   useEffect(() => {
@@ -351,7 +401,7 @@ export function ProjectsProvider({ children }) {
     localStorage.setItem('hiddenFromRegularDemos', JSON.stringify(hiddenFromRegularDemos));
   }, [hiddenFromRegularDemos]);
 
-  const createProject = (projectData) => {
+  const createProject = async (projectData) => {
     const newProject = {
       id: Date.now().toString(),
       name: projectData.name || 'Untitled Project',
@@ -368,22 +418,87 @@ export function ProjectsProvider({ children }) {
       throw new Error(`Invalid project data: ${validation.errors.join(', ')}`);
     }
     
+    // Try API first
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProject)
+      });
+      
+      if (response.ok) {
+        const createdProject = await response.json();
+        setProjects((prev) => [...prev, createdProject]);
+        return createdProject;
+      } else if (response.status === 501) {
+        // Database not enabled - use localStorage
+        console.log('API returned 501 - using localStorage');
+      } else {
+        throw new Error(`API error: ${response.status}`);
+      }
+    } catch (error) {
+      console.log('API create failed, using localStorage:', error);
+    }
+    
+    // Fallback to localStorage
     setProjects((prev) => [...prev, newProject]);
     return newProject;
   };
 
-  const updateProject = (id, updates) => {
+  const updateProject = async (id, updates) => {
+    // Don't update demo projects via API
+    if (id === DEMO_PROJECT_ID || id === EMPTY_DEMO_PROJECT_ID || id === PENDING_APPROVAL_DEMO_PROJECT_ID) {
+      // Update locally only (demo projects not in DB)
+      setProjects((prev) => {
+        return prev.map((project) => {
+          if (project.id === id) {
+            const updatedProject = { ...project, ...updates, updatedAt: new Date().toISOString() };
+            const dateValidation = validateProjectDates(updatedProject);
+            if (!dateValidation.isValid) {
+              console.warn(`Project ${id} has invalid dates:`, dateValidation.errors);
+            }
+            return updatedProject;
+          }
+          return project;
+        });
+      });
+      return;
+    }
+    
+    // Try API first
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      
+      if (response.ok) {
+        const updatedProject = await response.json();
+        setProjects((prev) => {
+          return prev.map((project) => project.id === id ? updatedProject : project);
+        });
+        return;
+      } else if (response.status === 501) {
+        // Database not enabled - use localStorage
+        console.log('API returned 501 - using localStorage');
+      } else {
+        throw new Error(`API error: ${response.status}`);
+      }
+    } catch (error) {
+      console.log('API update failed, using localStorage:', error);
+    }
+    
+    // Fallback to localStorage
     setProjects((prev) => {
       return prev.map((project) => {
         if (project.id === id) {
           const updatedProject = { ...project, ...updates, updatedAt: new Date().toISOString() };
           
-          // Validate dates before updating (don't throw, just log warnings for existing data)
+          // Validate dates before updating
           const dateValidation = validateProjectDates(updatedProject);
           if (!dateValidation.isValid) {
             console.warn(`Project ${id} has invalid dates:`, dateValidation.errors);
-            // Still allow update, but log the issue
-            // In production, you might want to throw or show user notification
           }
           
           return updatedProject;
@@ -393,11 +508,32 @@ export function ProjectsProvider({ children }) {
     });
   };
 
-  const deleteProject = (id) => {
+  const deleteProject = async (id) => {
     // Don't allow deleting demo projects
     if (id === DEMO_PROJECT_ID || id === EMPTY_DEMO_PROJECT_ID || id === PENDING_APPROVAL_DEMO_PROJECT_ID) {
       return;
     }
+    
+    // Try API first
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        setProjects((prev) => prev.filter((project) => project.id !== id));
+        return;
+      } else if (response.status === 501) {
+        // Database not enabled - use localStorage
+        console.log('API returned 501 - using localStorage');
+      } else {
+        throw new Error(`API error: ${response.status}`);
+      }
+    } catch (error) {
+      console.log('API delete failed, using localStorage:', error);
+    }
+    
+    // Fallback to localStorage
     setProjects((prev) => prev.filter((project) => project.id !== id));
   };
 
@@ -532,6 +668,7 @@ export function ProjectsProvider({ children }) {
         convertDemoToReal,
         removeOrDeleteProject,
         hiddenFromRegularDemos,
+        loading,
       }}
     >
       {children}

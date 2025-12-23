@@ -6,8 +6,12 @@ and proper cleanup.
 """
 from contextlib import contextmanager
 from sqlalchemy.exc import SQLAlchemyError
-from database import SessionLocal
 import logging
+
+try:
+    from database import SessionLocal  # Works when running from backend/ directory
+except ImportError:
+    from backend.database import SessionLocal  # Works when running from project root
 
 logger = logging.getLogger(__name__)
 

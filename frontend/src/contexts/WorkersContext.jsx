@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const WorkersContext = createContext(undefined);
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 // Demo workers data
 const DEMO_WORKERS = [
   {
@@ -403,14 +405,90 @@ const saveWorkers = (workers) => {
 
 export function WorkersProvider({ children }) {
   const [workers, setWorkers] = useState(() => loadWorkers());
+  const [loading, setLoading] = useState(false);
 
-  // Save to localStorage whenever workers change
+  // Load workers from API on mount (with localStorage fallback)
   useEffect(() => {
-    saveWorkers(workers);
+    async function loadWorkersFromAPI() {
+      setLoading(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/workers`);
+        if (response.ok) {
+          const data = await response.json();
+          const apiWorkers = data.workers || [];
+          
+          // Merge with demo workers (hardcoded, not in DB)
+          const allWorkers = [...DEMO_WORKERS, ...apiWorkers];
+          setWorkers(allWorkers);
+          
+          // Also save to localStorage for fallback
+          saveWorkers(apiWorkers); // Only save non-demo workers
+          
+          setLoading(false);
+          return;
+        } else if (response.status === 501) {
+          // Database not enabled - use localStorage fallback
+          console.log('API returned 501 - database not enabled, using localStorage');
+        }
+      } catch (error) {
+        // API not available or failed - use localStorage fallback
+        console.log('API call failed, using localStorage fallback:', error);
+      }
+      
+      // Fallback to localStorage (already loaded in initial state)
+      setLoading(false);
+    }
+
+    loadWorkersFromAPI();
+  }, []);
+
+  // Save to localStorage whenever workers change (only non-demo workers)
+  useEffect(() => {
+    // Filter out demo workers before saving
+    const nonDemoWorkers = workers.filter(
+      (w) => !(w.id && w.id.startsWith('worker-') && w.id.replace('worker-', '').match(/^\d+$/))
+    );
+    saveWorkers(nonDemoWorkers);
   }, [workers]);
 
   // Update a specific worker
-  const updateWorker = (workerId, updates) => {
+  const updateWorker = async (workerId, updates) => {
+    // Don't update demo workers via API
+    if (workerId && workerId.startsWith('worker-') && workerId.replace('worker-', '').match(/^\d+$/)) {
+      // Update locally only (demo workers not in DB)
+      setWorkers((prev) =>
+        prev.map((worker) =>
+          worker.id === workerId ? { ...worker, ...updates } : worker
+        )
+      );
+      return;
+    }
+    
+    // Try API first
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/workers/${workerId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      
+      if (response.ok) {
+        const updatedWorker = await response.json();
+        setWorkers((prev) =>
+          prev.map((worker) => worker.id === workerId ? updatedWorker : worker)
+        );
+        return;
+      } else if (response.status === 501) {
+        // Database not enabled - use localStorage
+        console.log('API returned 501 - using localStorage');
+      } else {
+        throw new Error(`API error: ${response.status}`);
+      }
+    } catch (error) {
+      console.log('API update failed, using localStorage:', error);
+    }
+    
+    // Fallback to localStorage
     setWorkers((prev) =>
       prev.map((worker) =>
         worker.id === workerId ? { ...worker, ...updates } : worker
@@ -419,48 +497,39 @@ export function WorkersProvider({ children }) {
   };
 
   // Add a new job to a worker
-  const addJobToWorker = (workerId, job) => {
-    setWorkers((prev) =>
-      prev.map((worker) =>
-        worker.id === workerId
-          ? { ...worker, jobs: [...(worker.jobs || []), job] }
-          : worker
-      )
-    );
+  const addJobToWorker = async (workerId, job) => {
+    const worker = workers.find((w) => w.id === workerId);
+    if (!worker) return;
+    
+    const updatedJobs = [...(worker.jobs || []), job];
+    // Update via API (updateWorker handles API/localStorage and state update)
+    await updateWorker(workerId, { jobs: updatedJobs });
   };
 
   // Update a job for a worker
-  const updateJob = (workerId, jobId, updates) => {
-    setWorkers((prev) =>
-      prev.map((worker) =>
-        worker.id === workerId
-          ? {
-              ...worker,
-              jobs: (worker.jobs || []).map((job) =>
-                job.id === jobId ? { ...job, ...updates } : job
-              ),
-            }
-          : worker
-      )
+  const updateJob = async (workerId, jobId, updates) => {
+    const worker = workers.find((w) => w.id === workerId);
+    if (!worker) return;
+    
+    const updatedJobs = (worker.jobs || []).map((job) =>
+      job.id === jobId ? { ...job, ...updates } : job
     );
+    // Update via API (updateWorker handles API/localStorage and state update)
+    await updateWorker(workerId, { jobs: updatedJobs });
   };
 
   // Delete a job from a worker
-  const deleteJob = (workerId, jobId) => {
-    setWorkers((prev) =>
-      prev.map((worker) =>
-        worker.id === workerId
-          ? {
-              ...worker,
-              jobs: (worker.jobs || []).filter((job) => job.id !== jobId),
-            }
-          : worker
-      )
-    );
+  const deleteJob = async (workerId, jobId) => {
+    const worker = workers.find((w) => w.id === workerId);
+    if (!worker) return;
+    
+    const updatedJobs = (worker.jobs || []).filter((job) => job.id !== jobId);
+    // Update via API (updateWorker handles API/localStorage and state update)
+    await updateWorker(workerId, { jobs: updatedJobs });
   };
 
   // Add a new worker
-  const addWorker = (worker) => {
+  const addWorker = async (worker) => {
     const newWorker = {
       id: `worker-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       name: worker.name || '',
@@ -468,12 +537,61 @@ export function WorkersProvider({ children }) {
       phone: worker.phone || '',
       jobs: worker.jobs || [],
     };
+    
+    // Try API first
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/workers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newWorker)
+      });
+      
+      if (response.ok) {
+        const createdWorker = await response.json();
+        setWorkers((prev) => [...prev, createdWorker]);
+        return createdWorker;
+      } else if (response.status === 501) {
+        // Database not enabled - use localStorage
+        console.log('API returned 501 - using localStorage');
+      } else {
+        throw new Error(`API error: ${response.status}`);
+      }
+    } catch (error) {
+      console.log('API create failed, using localStorage:', error);
+    }
+    
+    // Fallback to localStorage
     setWorkers((prev) => [...prev, newWorker]);
     return newWorker;
   };
 
   // Delete a worker
-  const deleteWorker = (workerId) => {
+  const deleteWorker = async (workerId) => {
+    // Don't allow deleting demo workers
+    if (workerId && workerId.startsWith('worker-') && workerId.replace('worker-', '').match(/^\d+$/)) {
+      return;
+    }
+    
+    // Try API first
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/workers/${workerId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        setWorkers((prev) => prev.filter((worker) => worker.id !== workerId));
+        return;
+      } else if (response.status === 501) {
+        // Database not enabled - use localStorage
+        console.log('API returned 501 - using localStorage');
+      } else {
+        throw new Error(`API error: ${response.status}`);
+      }
+    } catch (error) {
+      console.log('API delete failed, using localStorage:', error);
+    }
+    
+    // Fallback to localStorage
     setWorkers((prev) => prev.filter((worker) => worker.id !== workerId));
   };
 
@@ -488,6 +606,7 @@ export function WorkersProvider({ children }) {
         deleteJob,
         addWorker,
         deleteWorker,
+        loading,
       }}
     >
       {children}

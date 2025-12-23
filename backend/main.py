@@ -11,6 +11,18 @@ from typing import Optional, Any, Tuple, List
 from datetime import datetime
 from dotenv import load_dotenv
 
+# Database imports
+try:
+    from db_session import db_session, db_readonly_session
+    import services.materials_service as materials_service
+    import services.projects_service as projects_service
+    import services.workers_service as workers_service
+except ImportError:
+    from backend.db_session import db_session, db_readonly_session
+    import backend.services.materials_service as materials_service
+    import backend.services.projects_service as projects_service
+    import backend.services.workers_service as workers_service
+
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -45,13 +57,69 @@ default_model = os.getenv("OPENAI_MODEL", "gpt-4o")
 
 
 def load_materials_data() -> dict:
-    with open(MATERIALS_FILE_PATH, encoding='utf-8') as f:
-        return json.load(f)
+    """
+    Load materials data from database or JSON file based on USE_DATABASE flag.
+    
+    Returns:
+        dict: Materials data in JSON format
+    """
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if use_database:
+        try:
+            with db_readonly_session() as session:
+                return materials_service.get_materials_dict(session)
+        except Exception as e:
+            logger.error(f"Failed to load materials from database: {e}")
+            logger.warning("Falling back to JSON file")
+            # Fallback to JSON on error
+            with open(MATERIALS_FILE_PATH, encoding='utf-8') as f:
+                return json.load(f)
+    else:
+        # Read from JSON file
+        with open(MATERIALS_FILE_PATH, encoding='utf-8') as f:
+            return json.load(f)
 
 
 def write_materials_data(data: dict) -> None:
-    with open(MATERIALS_FILE_PATH, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    """
+    Write materials data to database and/or JSON file (dual-write).
+    
+    Strategy: Write to DB first (source of truth), then JSON (backup).
+    If DB write fails, transaction rolls back and operation fails.
+    If JSON write fails but DB succeeded, log warning and continue.
+    
+    Args:
+        data: Materials data dictionary in JSON format
+    """
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    db_success = False
+    
+    # Write to DB first (source of truth)
+    if use_database:
+        try:
+            with db_session() as session:
+                materials_service.save_materials_dict(data, session)
+                session.commit()
+                db_success = True
+                logger.debug("Materials written to database successfully")
+        except Exception as e:
+            logger.error(f"DB write failed: {e}")
+            raise  # Fail fast - don't write to JSON if DB fails
+    
+    # Write to JSON (backup during migration)
+    try:
+        with open(MATERIALS_FILE_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        logger.debug("Materials written to JSON file successfully")
+    except Exception as e:
+        logger.error(f"JSON write failed: {e}")
+        if db_success:
+            # DB succeeded but JSON failed - log warning, continue
+            logger.warning("JSON backup write failed, but DB write succeeded")
+        else:
+            raise  # Both failed
 
 
 def load_system_prompt() -> str:
@@ -230,6 +298,8 @@ def update_cell(section_id: str, item_index: int, field_path: str, new_value: An
     """
     Update a single field in the materials table with validation.
     
+    Supports both database and JSON modes based on USE_DATABASE flag.
+    
     Args:
         section_id: Section identifier
         item_index: Zero-based item index
@@ -244,18 +314,103 @@ def update_cell(section_id: str, item_index: int, field_path: str, new_value: An
     Raises:
         ValueError: If validation fails or item doesn't match expected product
     """
-    data = load_materials_data()
-    sections = data.get('sections', [])
-    section = match_section(sections, section_id)
-    if not section:
-        raise ValueError(f"Section '{section_id}' not found (match allowed on id or label).")
-    items = section.get('items', [])
-    if item_index < 0 or item_index >= len(items):
-        raise ValueError(f"Item index {item_index} is out of bounds for section '{section_id}'.")
-    item = items[item_index]
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
     
-    # Get old value before updating
-    old_value = get_nested_value(item, field_path)
+    if use_database:
+        # Update in database
+        try:
+            with db_session() as session:
+                # Get old value for logging
+                data = materials_service.get_materials_dict(session)
+                sections = data.get('sections', [])
+                section = match_section(sections, section_id)
+                if not section:
+                    raise ValueError(f"Section '{section_id}' not found")
+                items = section.get('items', [])
+                if item_index < 0 or item_index >= len(items):
+                    raise ValueError(f"Item index {item_index} is out of bounds for section '{section_id}'")
+                item = items[item_index]
+                old_value = get_nested_value(item, field_path)
+                
+                # Validate no-change
+                if old_value == new_value:
+                    product = item.get('product', '')
+                    raise ValueError(
+                        f"Update would result in no change. Old value and new value are identical for "
+                        f"product '{product}' at field '{field_path}'"
+                    )
+                
+                # Validate product hint if provided
+                if expected_product_hint:
+                    product = item.get('product', '').lower()
+                    hint_lower = expected_product_hint.lower()
+                    hint_matches = (hint_lower in product) or (product in hint_lower)
+                    if not hint_matches:
+                        raise ValueError(
+                            f"Product mismatch: Expected item matching '{expected_product_hint}', "
+                            f"but found '{item.get('product', '')}' at index {item_index} in section '{section_id}'"
+                        )
+                
+                # Update in database
+                updated_item = materials_service.update_item_field(
+                    session, section_id, item_index, field_path, new_value, expected_product_hint
+                )
+                session.commit()
+                
+                # Log edit
+                try:
+                    from models import Section
+                except ImportError:
+                    from backend.models import Section
+                
+                section_obj = session.query(Section).filter(Section.id == section_id).first()
+                log_edit(
+                    section_id=section_id,
+                    section_label=section_obj.label if section_obj else section_id,
+                    item_index=item_index,
+                    product=updated_item.product,
+                    field_path=field_path,
+                    old_value=old_value,
+                    new_value=new_value,
+                    source=source
+                )
+                
+                # Reload data to return updated JSON format
+                data = materials_service.get_materials_dict(session)
+                
+                # Write to JSON for backup (skip DB write since we already updated)
+                try:
+                    with open(MATERIALS_FILE_PATH, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                except Exception as e:
+                    logger.warning(f"JSON backup write failed: {e}")
+                
+                # Find updated item in JSON format for return
+                sections = data.get('sections', [])
+                section = match_section(sections, section_id)
+                items = section.get('items', []) if section else []
+                item = items[item_index] if item_index < len(items) else {}
+                
+                return data, item
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Database update failed: {e}")
+            raise ValueError(f"Failed to update item in database: {str(e)}")
+    else:
+        # Original JSON-based update logic
+        data = load_materials_data()
+        sections = data.get('sections', [])
+        section = match_section(sections, section_id)
+        if not section:
+            raise ValueError(f"Section '{section_id}' not found (match allowed on id or label).")
+        items = section.get('items', [])
+        if item_index < 0 or item_index >= len(items):
+            raise ValueError(f"Item index {item_index} is out of bounds for section '{section_id}'.")
+        item = items[item_index]
+        
+        # Get old value before updating
+        old_value = get_nested_value(item, field_path)
     
     # VALIDATION: Check if new value is actually different (especially for arrays)
     if old_value == new_value:
@@ -1369,9 +1524,8 @@ async def update_materials(update: MaterialsUpdate):
         if not isinstance(update.materials['sections'], list):
             raise HTTPException(status_code=400, detail="'sections' must be an array")
         
-        # Write to file
-        with open(MATERIALS_FILE_PATH, 'w', encoding='utf-8') as f:
-            json.dump(update.materials, f, indent=2, ensure_ascii=False)
+        # Write to database and/or JSON (dual-write)
+        write_materials_data(update.materials)
         
         return {"message": "Materials updated successfully", "status": "ok"}
     
@@ -1424,6 +1578,324 @@ async def get_edit_history(limit: Optional[int] = 100):
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving edit history: {str(e)}"
+        )
+
+
+# ============================================================================
+# Projects API Endpoints
+# ============================================================================
+
+class ProjectCreate(BaseModel):
+    name: str
+    address: Optional[str] = None
+    status: Optional[str] = "draft"
+    startDate: Optional[str] = None
+    endDate: Optional[str] = None
+    invoiceCount: Optional[int] = 0
+    percentagePaid: Optional[int] = 0
+    hasData: Optional[bool] = False
+    devisStatus: Optional[str] = None
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    status: Optional[str] = None
+    startDate: Optional[str] = None
+    endDate: Optional[str] = None
+    invoiceCount: Optional[int] = None
+    percentagePaid: Optional[int] = None
+    hasData: Optional[bool] = None
+    devisStatus: Optional[str] = None
+
+
+@app.get("/api/projects")
+async def get_projects():
+    """
+    Get all projects from database.
+    Returns 501 if database not enabled (frontend should use localStorage fallback).
+    """
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if not use_database:
+        raise HTTPException(
+            status_code=501,
+            detail="Database not enabled. Use localStorage fallback."
+        )
+    
+    try:
+        with db_readonly_session() as session:
+            projects = projects_service.get_all_projects(session)
+            return {"projects": projects, "count": len(projects)}
+    except Exception as e:
+        logger.error(f"Error getting projects: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving projects: {str(e)}"
+        )
+
+
+@app.get("/api/projects/{project_id}")
+async def get_project(project_id: str):
+    """Get a single project by ID."""
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if not use_database:
+        raise HTTPException(
+            status_code=501,
+            detail="Database not enabled. Use localStorage fallback."
+        )
+    
+    try:
+        with db_readonly_session() as session:
+            project = projects_service.get_project(session, project_id)
+            if not project:
+                raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+            return project
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting project: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving project: {str(e)}"
+        )
+
+
+@app.post("/api/projects")
+async def create_project(project: ProjectCreate):
+    """Create a new project."""
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if not use_database:
+        raise HTTPException(
+            status_code=501,
+            detail="Database not enabled. Use localStorage fallback."
+        )
+    
+    try:
+        project_data = project.dict()
+        project_data["id"] = f"project-{datetime.utcnow().timestamp() * 1000:.0f}"
+        
+        with db_session() as session:
+            created_project = projects_service.create_project(session, project_data)
+            return created_project
+    except Exception as e:
+        logger.error(f"Error creating project: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating project: {str(e)}"
+        )
+
+
+@app.put("/api/projects/{project_id}")
+async def update_project(project_id: str, updates: ProjectUpdate):
+    """Update an existing project."""
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if not use_database:
+        raise HTTPException(
+            status_code=501,
+            detail="Database not enabled. Use localStorage fallback."
+        )
+    
+    try:
+        # Convert None values to actual None (not missing keys)
+        update_dict = {k: v for k, v in updates.dict().items() if v is not None}
+        
+        with db_session() as session:
+            updated_project = projects_service.update_project(session, project_id, update_dict)
+            if not updated_project:
+                raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+            return updated_project
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating project: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating project: {str(e)}"
+        )
+
+
+@app.delete("/api/projects/{project_id}")
+async def delete_project(project_id: str):
+    """Delete a project."""
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if not use_database:
+        raise HTTPException(
+            status_code=501,
+            detail="Database not enabled. Use localStorage fallback."
+        )
+    
+    try:
+        with db_session() as session:
+            deleted = projects_service.delete_project(session, project_id)
+            if not deleted:
+                raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+            return {"message": "Project deleted successfully", "status": "ok"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting project: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting project: {str(e)}"
+        )
+
+
+# ============================================================================
+# Workers API Endpoints
+# ============================================================================
+
+class WorkerCreate(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    jobs: Optional[List[dict]] = []
+
+
+class WorkerUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    jobs: Optional[List[dict]] = None
+
+
+@app.get("/api/workers")
+async def get_workers():
+    """
+    Get all workers from database.
+    Returns 501 if database not enabled (frontend should use localStorage fallback).
+    """
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if not use_database:
+        raise HTTPException(
+            status_code=501,
+            detail="Database not enabled. Use localStorage fallback."
+        )
+    
+    try:
+        with db_readonly_session() as session:
+            workers = workers_service.get_all_workers(session)
+            return {"workers": workers, "count": len(workers)}
+    except Exception as e:
+        logger.error(f"Error getting workers: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving workers: {str(e)}"
+        )
+
+
+@app.get("/api/workers/{worker_id}")
+async def get_worker(worker_id: str):
+    """Get a single worker by ID."""
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if not use_database:
+        raise HTTPException(
+            status_code=501,
+            detail="Database not enabled. Use localStorage fallback."
+        )
+    
+    try:
+        with db_readonly_session() as session:
+            worker = workers_service.get_worker(session, worker_id)
+            if not worker:
+                raise HTTPException(status_code=404, detail=f"Worker '{worker_id}' not found")
+            return worker
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting worker: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error retrieving worker: {str(e)}"
+        )
+
+
+@app.post("/api/workers")
+async def create_worker(worker: WorkerCreate):
+    """Create a new worker."""
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if not use_database:
+        raise HTTPException(
+            status_code=501,
+            detail="Database not enabled. Use localStorage fallback."
+        )
+    
+    try:
+        worker_data = worker.dict()
+        worker_data["id"] = f"worker-{datetime.utcnow().timestamp() * 1000:.0f}"
+        
+        with db_session() as session:
+            created_worker = workers_service.create_worker(session, worker_data)
+            return created_worker
+    except Exception as e:
+        logger.error(f"Error creating worker: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating worker: {str(e)}"
+        )
+
+
+@app.put("/api/workers/{worker_id}")
+async def update_worker(worker_id: str, updates: WorkerUpdate):
+    """Update an existing worker."""
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if not use_database:
+        raise HTTPException(
+            status_code=501,
+            detail="Database not enabled. Use localStorage fallback."
+        )
+    
+    try:
+        # Convert None values to actual None (not missing keys)
+        update_dict = {k: v for k, v in updates.dict().items() if v is not None}
+        
+        with db_session() as session:
+            updated_worker = workers_service.update_worker(session, worker_id, update_dict)
+            if not updated_worker:
+                raise HTTPException(status_code=404, detail=f"Worker '{worker_id}' not found")
+            return updated_worker
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating worker: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating worker: {str(e)}"
+        )
+
+
+@app.delete("/api/workers/{worker_id}")
+async def delete_worker(worker_id: str):
+    """Delete a worker."""
+    use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
+    
+    if not use_database:
+        raise HTTPException(
+            status_code=501,
+            detail="Database not enabled. Use localStorage fallback."
+        )
+    
+    try:
+        with db_session() as session:
+            deleted = workers_service.delete_worker(session, worker_id)
+            if not deleted:
+                raise HTTPException(status_code=404, detail=f"Worker '{worker_id}' not found")
+            return {"message": "Worker deleted successfully", "status": "ok"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting worker: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting worker: {str(e)}"
         )
 
 
