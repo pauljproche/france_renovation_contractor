@@ -7,11 +7,26 @@ and proper cleanup.
 from contextlib import contextmanager
 from sqlalchemy.exc import SQLAlchemyError
 import logging
+import sys
+from pathlib import Path
 
+# Handle imports for both backend/ and project root execution
 try:
     from database import SessionLocal  # Works when running from backend/ directory
 except ImportError:
-    from backend.database import SessionLocal  # Works when running from project root
+    # Try adding parent directory to path for project root execution
+    backend_dir = Path(__file__).parent
+    if str(backend_dir.parent) not in sys.path:
+        sys.path.insert(0, str(backend_dir.parent))
+    try:
+        from backend.database import SessionLocal
+    except ImportError:
+        # Last resort: try relative import
+        import os
+        if os.path.exists(os.path.join(os.path.dirname(__file__), 'database.py')):
+            # We're in backend/, try again with absolute import
+            raise ImportError("Cannot import database module. Please ensure database.py exists in backend/ directory.")
+        raise
 
 logger = logging.getLogger(__name__)
 

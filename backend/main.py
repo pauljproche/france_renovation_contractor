@@ -11,21 +11,31 @@ from typing import Optional, Any, Tuple, List
 from datetime import datetime
 from dotenv import load_dotenv
 
-# Database imports
-try:
-    from db_session import db_session, db_readonly_session
-    import services.materials_service as materials_service
-    import services.projects_service as projects_service
-    import services.workers_service as workers_service
-except ImportError:
-    from backend.db_session import db_session, db_readonly_session
-    import backend.services.materials_service as materials_service
-    import backend.services.projects_service as projects_service
-    import backend.services.workers_service as workers_service
-
 logger = logging.getLogger(__name__)
 
 load_dotenv()
+
+# Database imports (only when USE_DATABASE is enabled)
+USE_DATABASE = os.getenv("USE_DATABASE", "false").lower() == "true"
+
+if USE_DATABASE:
+    try:
+        from db_session import db_session, db_readonly_session
+        import services.materials_service as materials_service
+        import services.projects_service as projects_service
+        import services.workers_service as workers_service
+    except ImportError:
+        from backend.db_session import db_session, db_readonly_session
+        import backend.services.materials_service as materials_service
+        import backend.services.projects_service as projects_service
+        import backend.services.workers_service as workers_service
+else:
+    # Dummy functions for when database is disabled
+    db_session = None
+    db_readonly_session = None
+    materials_service = None
+    projects_service = None
+    workers_service = None
 
 # Path to materials.json
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
