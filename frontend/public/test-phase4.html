@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Phase 4 Frontend Test - Database Reads</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; background: #f5f5f5; }
+        .test { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background: white; }
+        .pass { background: #d4edda; border-color: #c3e6cb; }
+        .fail { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
+        button:hover { background: #0056b3; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; border-radius: 4px; }
+        .status { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 12px; font-weight: bold; }
+        .status.pass { background: #28a745; color: white; }
+        .status.fail { background: #dc3545; color: white; }
+        .status.warn { background: #ffc107; color: black; }
+        h1 { color: #333; }
+        h2 { color: #666; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Phase 4 Frontend Testing - Database Reads</h1>
+    
+    <div class="test info">
+        <h2>Test Configuration</h2>
+        <p><strong>Backend:</strong> <span id="backend-url">http://localhost:8000</span></p>
+        <p><strong>Frontend:</strong> <span id="frontend-url">http://localhost:5173</span></p>
+        <p><strong>USE_DATABASE:</strong> <span id="db-status">Checking...</span></p>
+        <p><strong>Expected Behavior:</strong> API should return 200 with data from database (not 501)</p>
+    </div>
+
+    <div class="test">
+        <h2>Test 1: Backend Health Check</h2>
+        <button onclick="testBackend()">Test Backend</button>
+        <div id="backend-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 2: Projects API (Should return 200 with DB data)</h2>
+        <button onclick="testProjectsAPI()">Test Projects API</button>
+        <div id="projects-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 3: Workers API (Should return 200 with DB data)</h2>
+        <button onclick="testWorkersAPI()">Test Workers API</button>
+        <div id="workers-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 4: CORS Headers (Frontend Compatibility)</h2>
+        <button onclick="testCORS()">Test CORS</button>
+        <div id="cors-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 5: Frontend App Load Test</h2>
+        <button onclick="testFrontendLoad()">Test Frontend</button>
+        <div id="frontend-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 6: End-to-End Flow</h2>
+        <button onclick="testEndToEnd()">Test Full Flow</button>
+        <div id="e2e-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>All Tests Summary</h2>
+        <button onclick="runAllTests()" style="background: #28a745;">Run All Tests</button>
+        <div id="summary"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const FRONTEND_BASE = 'http://localhost:5173';
+        
+        let testResults = {};
+
+        async function testBackend() {
+            const resultDiv = document.getElementById('backend-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <span class="status pass">PASS</span>
+                        <p>Backend is responding correctly.</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    resultDiv.parentElement.className = 'test pass';
+                    testResults.backend = true;
+                } else {
+                    throw new Error(`Status: ${response.status}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status fail">FAIL</span>
+                    <p>Backend not responding: ${error.message}</p>
+                `;
+                resultDiv.parentElement.className = 'test fail';
+                testResults.backend = false;
+            }
+        }
+
+        async function testProjectsAPI() {
+            const resultDiv = document.getElementById('projects-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                const startTime = performance.now();
+                const response = await fetch(`${API_BASE}/api/projects`);
+                const endTime = performance.now();
+                const duration = Math.round(endTime - startTime);
+                
+                const status = response.status;
+                const data = await response.json();
+                
+                if (status === 200) {
+                    const count = data.count !== undefined ? data.count : (Array.isArray(data.projects) ? data.projects.length : 0);
+                    resultDiv.innerHTML = `
+                        <span class="status pass">PASS (Status: 200)</span>
+                        <p>✅ API is reading from database successfully!</p>
+                        <p><strong>Response time:</strong> ${duration}ms</p>
+                        <p><strong>Projects count:</strong> ${count}</p>
+                        <p>Frontend can now load projects from database via API.</p>
+                        <pre>${JSON.stringify(data, null, 2).substring(0, 500)}${data.count !== undefined ? '...' : ''}</pre>
+                    `;
+                    resultDiv.parentElement.className = 'test pass';
+                    testResults.projects = true;
+                    updateDBStatus('Enabled ✓');
+                } else if (status === 501) {
+                    resultDiv.innerHTML = `
+                        <span class="status fail">FAIL (Status: 501)</span>
+                        <p>❌ API returned 501 - database not enabled or not working.</p>
+                        <p>Expected: 200 (reading from database)</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    resultDiv.parentElement.className = 'test fail';
+                    testResults.projects = false;
+                    updateDBStatus('Not Enabled');
+                } else {
+                    throw new Error(`Unexpected status: ${status}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status fail">FAIL</span>
+                    <p>Error: ${error.message}</p>
+                    <p>Check if backend is running and USE_DATABASE=true</p>
+                `;
+                resultDiv.parentElement.className = 'test fail';
+                testResults.projects = false;
+            }
+        }
+
+        async function testWorkersAPI() {
+            const resultDiv = document.getElementById('workers-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                const startTime = performance.now();
+                const response = await fetch(`${API_BASE}/api/workers`);
+                const endTime = performance.now();
+                const duration = Math.round(endTime - startTime);
+                
+                const status = response.status;
+                const data = await response.json();
+                
+                if (status === 200) {
+                    const count = data.count !== undefined ? data.count : (Array.isArray(data.workers) ? data.workers.length : 0);
+                    resultDiv.innerHTML = `
+                        <span class="status pass">PASS (Status: 200)</span>
+                        <p>✅ API is reading from database successfully!</p>
+                        <p><strong>Response time:</strong> ${duration}ms</p>
+                        <p><strong>Workers count:</strong> ${count}</p>
+                        <p>Frontend can now load workers from database via API.</p>
+                        <pre>${JSON.stringify(data, null, 2).substring(0, 500)}${data.count !== undefined ? '...' : ''}</pre>
+                    `;
+                    resultDiv.parentElement.className = 'test pass';
+                    testResults.workers = true;
+                } else if (status === 501) {
+                    resultDiv.innerHTML = `
+                        <span class="status fail">FAIL (Status: 501)</span>
+                        <p>❌ API returned 501 - database not enabled or not working.</p>
+                        <p>Expected: 200 (reading from database)</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    resultDiv.parentElement.className = 'test fail';
+                    testResults.workers = false;
+                } else {
+                    throw new Error(`Unexpected status: ${status}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status fail">FAIL</span>
+                    <p>Error: ${error.message}</p>
+                `;
+                resultDiv.parentElement.className = 'test fail';
+                testResults.workers = false;
+            }
+        }
+
+        async function testCORS() {
+            const resultDiv = document.getElementById('cors-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/`, {
+                    method: 'GET',
+                    headers: {
+                        'Origin': FRONTEND_BASE
+                    }
+                });
+                
+                const corsHeader = response.headers.get('Access-Control-Allow-Origin');
+                const corsMethods = response.headers.get('Access-Control-Allow-Methods');
+                
+                if (corsHeader || corsMethods) {
+                    resultDiv.innerHTML = `
+                        <span class="status pass">PASS</span>
+                        <p>CORS headers detected - frontend can make requests:</p>
+                        <ul>
+                            <li>Access-Control-Allow-Origin: ${corsHeader || 'Not set (but request succeeded)'}</li>
+                            <li>Access-Control-Allow-Methods: ${corsMethods || 'Not set'}</li>
+                        </ul>
+                        <p>✅ Frontend should be able to call API without CORS issues.</p>
+                    `;
+                    resultDiv.parentElement.className = 'test pass';
+                    testResults.cors = true;
+                } else {
+                    resultDiv.innerHTML = `
+                        <span class="status warn">WARNING</span>
+                        <p>No explicit CORS headers, but request succeeded.</p>
+                        <p>This may work if backend allows all origins by default.</p>
+                    `;
+                    resultDiv.parentElement.className = 'test info';
+                    testResults.cors = true; // Still pass if request works
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status fail">FAIL</span>
+                    <p>CORS test error: ${error.message}</p>
+                `;
+                resultDiv.parentElement.className = 'test fail';
+                testResults.cors = false;
+            }
+        }
+
+        async function testFrontendLoad() {
+            const resultDiv = document.getElementById('frontend-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                const response = await fetch(FRONTEND_BASE);
+                const html = await response.text();
+                
+                if (response.ok && html.includes('<!doctype html') || html.includes('<html')) {
+                    resultDiv.innerHTML = `
+                        <span class="status pass">PASS</span>
+                        <p>✅ Frontend is accessible and serving HTML.</p>
+                        <p><strong>Next steps:</strong></p>
+                        <ol>
+                            <li>Open <a href="${FRONTEND_BASE}" target="_blank">${FRONTEND_BASE}</a> in browser</li>
+                            <li>Open browser console (F12)</li>
+                            <li>Navigate to Dashboard</li>
+                            <li>Verify no errors and projects load from API</li>
+                        </ol>
+                    `;
+                    resultDiv.parentElement.className = 'test pass';
+                    testResults.frontend = true;
+                } else {
+                    throw new Error('Frontend not accessible');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status fail">FAIL</span>
+                    <p>Frontend not accessible: ${error.message}</p>
+                    <p>Start frontend with: <code>cd frontend && npm run dev</code></p>
+                `;
+                resultDiv.parentElement.className = 'test fail';
+                testResults.frontend = false;
+            }
+        }
+
+        async function testEndToEnd() {
+            const resultDiv = document.getElementById('e2e-result');
+            resultDiv.innerHTML = '<p>Testing end-to-end flow...</p>';
+            
+            const steps = [];
+            let allPassed = true;
+            
+            // Step 1: Backend accessible
+            try {
+                const backendRes = await fetch(`${API_BASE}/`);
+                if (backendRes.ok) {
+                    steps.push('✅ Backend accessible');
+                } else {
+                    steps.push('❌ Backend not accessible');
+                    allPassed = false;
+                }
+            } catch (e) {
+                steps.push('❌ Backend error: ' + e.message);
+                allPassed = false;
+            }
+            
+            // Step 2: Projects API works
+            try {
+                const projectsRes = await fetch(`${API_BASE}/api/projects`);
+                if (projectsRes.status === 200) {
+                    const data = await projectsRes.json();
+                    steps.push(`✅ Projects API returns 200 (${data.count || 0} projects from DB)`);
+                } else {
+                    steps.push(`❌ Projects API returned ${projectsRes.status}`);
+                    allPassed = false;
+                }
+            } catch (e) {
+                steps.push('❌ Projects API error: ' + e.message);
+                allPassed = false;
+            }
+            
+            // Step 3: Workers API works
+            try {
+                const workersRes = await fetch(`${API_BASE}/api/workers`);
+                if (workersRes.status === 200) {
+                    const data = await workersRes.json();
+                    steps.push(`✅ Workers API returns 200 (${data.count || 0} workers from DB)`);
+                } else {
+                    steps.push(`❌ Workers API returned ${workersRes.status}`);
+                    allPassed = false;
+                }
+            } catch (e) {
+                steps.push('❌ Workers API error: ' + e.message);
+                allPassed = false;
+            }
+            
+            // Step 4: Frontend accessible
+            try {
+                const frontendRes = await fetch(FRONTEND_BASE);
+                if (frontendRes.ok) {
+                    steps.push('✅ Frontend accessible');
+                } else {
+                    steps.push('❌ Frontend not accessible');
+                    allPassed = false;
+                }
+            } catch (e) {
+                steps.push('❌ Frontend error: ' + e.message);
+                allPassed = false;
+            }
+            
+            resultDiv.innerHTML = `
+                <span class="status ${allPassed ? 'pass' : 'fail'}">${allPassed ? 'PASS' : 'FAIL'}</span>
+                <h3>End-to-End Flow Test:</h3>
+                <ul>
+                    ${steps.map(s => `<li>${s}</li>`).join('')}
+                </ul>
+                ${allPassed ? '<p><strong>✅ All checks passed! Frontend should work with database reads.</strong></p>' : '<p><strong>❌ Some checks failed. Please review errors above.</strong></p>'}
+            `;
+            resultDiv.parentElement.className = `test ${allPassed ? 'pass' : 'fail'}`;
+            testResults.e2e = allPassed;
+        }
+
+        function updateDBStatus(status) {
+            const dbStatus = document.getElementById('db-status');
+            dbStatus.textContent = status;
+        }
+
+        async function runAllTests() {
+            const summaryDiv = document.getElementById('summary');
+            summaryDiv.innerHTML = '<p>Running all tests...</p>';
+            
+            testResults = {};
+            
+            await testBackend();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testProjectsAPI();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testWorkersAPI();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testCORS();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testFrontendLoad();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testEndToEnd();
+            
+            const passed = Object.values(testResults).filter(v => v === true).length;
+            const total = Object.keys(testResults).length;
+            
+            summaryDiv.innerHTML = `
+                <h3>Test Summary: ${passed}/${total} passed</h3>
+                <ul>
+                    ${Object.entries(testResults).map(([key, passed]) => 
+                        `<li>${key}: <span class="status ${passed ? 'pass' : 'fail'}">${passed ? 'PASS' : 'FAIL'}</span></li>`
+                    ).join('')}
+                </ul>
+                ${passed === total ? 
+                    '<p style="color: green; font-weight: bold; font-size: 18px;">✅ All tests passed! Phase 4 frontend integration is working!</p>' : 
+                    '<p style="color: red; font-weight: bold;">❌ Some tests failed. Please review errors above.</p>'
+                }
+                <hr>
+                <p><strong>Next Steps:</strong></p>
+                <ol>
+                    <li>Open <a href="${FRONTEND_BASE}" target="_blank">${FRONTEND_BASE}</a> in browser</li>
+                    <li>Open browser console (F12) and check Network tab</li>
+                    <li>Navigate to Dashboard - should see API calls to /api/projects</li>
+                    <li>Verify projects load from database (empty array is OK, just verify no 501 errors)</li>
+                    <li>Check console for any errors</li>
+                </ol>
+            `;
+        }
+
+        // Check database status on load
+        fetch(`${API_BASE}/api/projects`)
+            .then(r => {
+                if (r.status === 200) {
+                    updateDBStatus('Enabled ✓ (Reading from database)');
+                } else if (r.status === 501) {
+                    updateDBStatus('Not Enabled (Should return 200)');
+                } else {
+                    updateDBStatus('Unknown');
+                }
+            })
+            .catch(() => updateDBStatus('Cannot connect'));
+    </script>
+</body>
+</html>

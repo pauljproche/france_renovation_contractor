@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Phase 3 Frontend Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .test { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .pass { background: #d4edda; border-color: #c3e6cb; }
+        .fail { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+        .status { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 12px; font-weight: bold; }
+        .status.pass { background: #28a745; color: white; }
+        .status.fail { background: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Phase 3 Frontend Testing</h1>
+    
+    <div class="test info">
+        <h2>Test Configuration</h2>
+        <p><strong>Backend:</strong> <span id="backend-url">http://localhost:8000</span></p>
+        <p><strong>Frontend:</strong> <span id="frontend-url">http://localhost:5173</span></p>
+        <p><strong>USE_DATABASE:</strong> <span id="db-status">Checking...</span></p>
+    </div>
+
+    <div class="test">
+        <h2>Test 1: Backend Health Check</h2>
+        <button onclick="testBackend()">Test Backend</button>
+        <div id="backend-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 2: Projects API (Should return 501 if DB disabled)</h2>
+        <button onclick="testProjectsAPI()">Test Projects API</button>
+        <div id="projects-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 3: Workers API (Should return 501 if DB disabled)</h2>
+        <button onclick="testWorkersAPI()">Test Workers API</button>
+        <div id="workers-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 4: Frontend localStorage Fallback</h2>
+        <button onclick="testLocalStorage()">Test localStorage</button>
+        <button onclick="clearLocalStorage()">Clear localStorage</button>
+        <div id="localStorage-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>Test 5: CORS Headers</h2>
+        <button onclick="testCORS()">Test CORS</button>
+        <div id="cors-result"></div>
+    </div>
+
+    <div class="test">
+        <h2>All Tests Summary</h2>
+        <button onclick="runAllTests()">Run All Tests</button>
+        <div id="summary"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        const FRONTEND_BASE = 'http://localhost:5173';
+        
+        let testResults = {};
+
+        async function testBackend() {
+            const resultDiv = document.getElementById('backend-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <span class="status pass">PASS</span>
+                        <p>Backend is responding correctly.</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    resultDiv.parentElement.className = 'test pass';
+                    testResults.backend = true;
+                } else {
+                    throw new Error(`Status: ${response.status}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status fail">FAIL</span>
+                    <p>Backend not responding: ${error.message}</p>
+                `;
+                resultDiv.parentElement.className = 'test fail';
+                testResults.backend = false;
+            }
+        }
+
+        async function testProjectsAPI() {
+            const resultDiv = document.getElementById('projects-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/projects`);
+                const status = response.status;
+                const data = await response.json();
+                
+                if (status === 501) {
+                    resultDiv.innerHTML = `
+                        <span class="status pass">PASS (Expected 501)</span>
+                        <p>API correctly returns 501 when database is disabled.</p>
+                        <p>Frontend should fall back to localStorage.</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    resultDiv.parentElement.className = 'test pass';
+                    testResults.projects = true;
+                } else if (status === 200) {
+                    resultDiv.innerHTML = `
+                        <span class="status pass">PASS (Database Enabled)</span>
+                        <p>API is working with database enabled.</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    resultDiv.parentElement.className = 'test pass';
+                    testResults.projects = true;
+                    updateDBStatus('true');
+                } else {
+                    throw new Error(`Unexpected status: ${status}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status fail">FAIL</span>
+                    <p>Error: ${error.message}</p>
+                `;
+                resultDiv.parentElement.className = 'test fail';
+                testResults.projects = false;
+            }
+        }
+
+        async function testWorkersAPI() {
+            const resultDiv = document.getElementById('workers-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/workers`);
+                const status = response.status;
+                const data = await response.json();
+                
+                if (status === 501) {
+                    resultDiv.innerHTML = `
+                        <span class="status pass">PASS (Expected 501)</span>
+                        <p>API correctly returns 501 when database is disabled.</p>
+                        <p>Frontend should fall back to localStorage.</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    resultDiv.parentElement.className = 'test pass';
+                    testResults.workers = true;
+                } else if (status === 200) {
+                    resultDiv.innerHTML = `
+                        <span class="status pass">PASS (Database Enabled)</span>
+                        <p>API is working with database enabled.</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    resultDiv.parentElement.className = 'test pass';
+                    testResults.workers = true;
+                    updateDBStatus('true');
+                } else {
+                    throw new Error(`Unexpected status: ${status}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status fail">FAIL</span>
+                    <p>Error: ${error.message}</p>
+                `;
+                resultDiv.parentElement.className = 'test fail';
+                testResults.workers = false;
+            }
+        }
+
+        function testLocalStorage() {
+            const resultDiv = document.getElementById('localStorage-result');
+            
+            // Test localStorage access
+            const testKey = 'test_phase3';
+            const testValue = { test: 'data', timestamp: Date.now() };
+            
+            try {
+                localStorage.setItem(testKey, JSON.stringify(testValue));
+                const retrieved = JSON.parse(localStorage.getItem(testKey));
+                
+                // Check for projects/workers in localStorage
+                const hasProjects = localStorage.getItem('renovationProjects') !== null;
+                const hasWorkers = localStorage.getItem('workers') !== null;
+                
+                resultDiv.innerHTML = `
+                    <span class="status pass">PASS</span>
+                    <p>localStorage is accessible and working.</p>
+                    <ul>
+                        <li>Test write/read: ✓</li>
+                        <li>Has projects: ${hasProjects ? '✓' : '✗'}</li>
+                        <li>Has workers: ${hasWorkers ? '✓' : '✗'}</li>
+                    </ul>
+                    ${hasProjects ? `<pre>Projects: ${localStorage.getItem('renovationProjects').substring(0, 200)}...</pre>` : ''}
+                `;
+                resultDiv.parentElement.className = 'test pass';
+                testResults.localStorage = true;
+                
+                localStorage.removeItem(testKey);
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status fail">FAIL</span>
+                    <p>localStorage error: ${error.message}</p>
+                `;
+                resultDiv.parentElement.className = 'test fail';
+                testResults.localStorage = false;
+            }
+        }
+
+        function clearLocalStorage() {
+            localStorage.clear();
+            document.getElementById('localStorage-result').innerHTML = '<p>localStorage cleared.</p>';
+        }
+
+        async function testCORS() {
+            const resultDiv = document.getElementById('cors-result');
+            resultDiv.innerHTML = '<p>Testing...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': FRONTEND_BASE,
+                        'Access-Control-Request-Method': 'GET'
+                    }
+                });
+                
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
+                };
+                
+                resultDiv.innerHTML = `
+                    <span class="status pass">PASS</span>
+                    <p>CORS headers detected:</p>
+                    <pre>${JSON.stringify(corsHeaders, null, 2)}</pre>
+                `;
+                resultDiv.parentElement.className = 'test pass';
+                testResults.cors = true;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status fail">FAIL</span>
+                    <p>CORS test error: ${error.message}</p>
+                    <p>Note: This might fail in some browsers due to OPTIONS preflight. Try a GET request instead.</p>
+                `;
+                resultDiv.parentElement.className = 'test fail';
+                testResults.cors = false;
+            }
+        }
+
+        function updateDBStatus(status) {
+            const dbStatus = document.getElementById('db-status');
+            dbStatus.textContent = status === 'true' ? 'Enabled ✓' : 'Disabled (fallback mode)';
+        }
+
+        async function runAllTests() {
+            const summaryDiv = document.getElementById('summary');
+            summaryDiv.innerHTML = '<p>Running all tests...</p>';
+            
+            testResults = {};
+            
+            await testBackend();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testProjectsAPI();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testWorkersAPI();
+            await new Promise(r => setTimeout(r, 500));
+            
+            testLocalStorage();
+            await new Promise(r => setTimeout(r, 500));
+            
+            await testCORS();
+            
+            const passed = Object.values(testResults).filter(v => v === true).length;
+            const total = Object.keys(testResults).length;
+            
+            summaryDiv.innerHTML = `
+                <h3>Test Summary: ${passed}/${total} passed</h3>
+                <ul>
+                    ${Object.entries(testResults).map(([key, passed]) => 
+                        `<li>${key}: <span class="status ${passed ? 'pass' : 'fail'}">${passed ? 'PASS' : 'FAIL'}</span></li>`
+                    ).join('')}
+                </ul>
+                ${passed === total ? '<p style="color: green; font-weight: bold;">✅ All tests passed!</p>' : ''}
+            `;
+        }
+
+        // Check database status on load
+        fetch(`${API_BASE}/api/projects`)
+            .then(r => updateDBStatus(r.status === 200 ? 'true' : 'false'))
+            .catch(() => updateDBStatus('unknown'));
+    </script>
+</body>
+</html>

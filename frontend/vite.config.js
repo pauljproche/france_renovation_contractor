@@ -4,7 +4,7 @@ import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  publicDir: resolve(__dirname, '../data'),
+  publicDir: resolve(__dirname, 'public'), // Serve from frontend/public directory
   server: {
     port: 5173,
     open: true

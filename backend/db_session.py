@@ -21,12 +21,24 @@ except ImportError:
     try:
         from backend.database import SessionLocal
     except ImportError:
-        # Last resort: try relative import
+        # Check if database.py exists
         import os
-        if os.path.exists(os.path.join(os.path.dirname(__file__), 'database.py')):
-            # We're in backend/, try again with absolute import
+        db_file = os.path.join(os.path.dirname(__file__), 'database.py')
+        if os.path.exists(db_file):
+            # File exists but import failed - might be due to database connection error
+            # Try importing with error handling
+            try:
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("database", db_file)
+                database_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(database_module)
+                SessionLocal = database_module.SessionLocal
+            except Exception as e:
+                # If it's a database connection error, that's expected if DB isn't running
+                # Re-raise for now - the error will be caught at the application level
+                raise ImportError(f"Cannot import database module. Error: {e}")
+        else:
             raise ImportError("Cannot import database module. Please ensure database.py exists in backend/ directory.")
-        raise
 
 logger = logging.getLogger(__name__)
 
