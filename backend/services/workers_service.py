@@ -339,3 +339,4 @@ def delete_worker(session: Session, worker_id: str) -> bool:
     session.flush()
     
     return True
+

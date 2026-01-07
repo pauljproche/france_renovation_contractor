@@ -283,3 +283,4 @@ GROUP BY s.id, s.label;
 -- Check recent updates
 SELECT product, updated_at FROM items ORDER BY updated_at DESC LIMIT 10;
 ```
+

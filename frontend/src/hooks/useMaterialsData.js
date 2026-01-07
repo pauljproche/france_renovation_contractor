@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useProjects } from '../contexts/ProjectsContext.jsx';
 
-const DATA_ENDPOINT = '/materials.json';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Phase 4+: Use API endpoint instead of static JSON file
+const DATA_ENDPOINT = `${API_BASE_URL}/api/materials`;
 export const MATERIALS_RELOAD_EVENT = 'materials-data-reload';
 
 function normalizeMoney(value) {
@@ -124,6 +125,7 @@ export function useMaterialsData() {
 
       let dataEndpoint = DATA_ENDPOINT;
       if (selectedProject?.id === 'pending-approval-demo-project') {
+        // For demo projects, still use static file if available, otherwise use API
         dataEndpoint = '/materials-pending-approval.json';
       }
 

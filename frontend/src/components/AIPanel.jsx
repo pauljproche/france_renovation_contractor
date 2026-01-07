@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { queryMaterialsAssistant } from '../services/assistant.js';
+import { queryMaterialsAssistant, confirmAction } from '../services/assistant.js';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useLanguage } from '../contexts/AppContext.jsx';
 import { useChatHistory } from '../contexts/ChatHistoryContext.jsx';
 import { useAIPanel } from '../contexts/AppContext.jsx';
 import { useMaterialsData, MATERIALS_RELOAD_EVENT } from '../hooks/useMaterialsData.js';
 import { useCustomTable } from '../contexts/CustomTableContext.jsx';
+import ActionPreviewModal from './ActionPreviewModal.jsx';
 import {
   loadAIPanelSessions,
   saveAIPanelSessions,
@@ -44,6 +45,7 @@ function AIPanel() {
   
   const [sessions, setSessions] = useState(() => loadAIPanelSessions());
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
+  const [previewModal, setPreviewModal] = useState(null); // { preview, action_id }
   const contentRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -165,34 +167,65 @@ function AIPanel() {
     setLoading(true);
 
     try {
+      // Phase 5: Don't send full materials dataset when using database
+      // The backend will use query tools instead, reducing token usage
+      // Send empty object to indicate we're using database mode
       const answer = await queryMaterialsAssistant({ 
         prompt: userPrompt, 
-        materials,
+        materials: {}, // Backend will use database query tools when USE_DATABASE is true
         customTables: customTables.length > 0 ? customTables : undefined,
         language
       });
-      // answer is now an object with { en, fr }
-      const assistantMessage = { 
-        type: 'assistant', 
-        content: answer // Store both en and fr
-      };
       
-      // Add assistant response
-      setChatMessages(prev => [...prev, assistantMessage]);
+      // Phase 5: Check if response is a preview (requires confirmation)
+      if (answer.type === 'preview') {
+        // Show preview modal
+        setPreviewModal({
+          preview: answer.preview,
+          action_id: answer.action_id,
+          message: answer.message
+        });
+        
+        // Add assistant message explaining preview
+        const assistantMessage = { 
+          type: 'assistant', 
+          content: answer.message || {
+            en: 'I\'ve prepared an action. Please review the preview and confirm to execute.',
+            fr: 'J\'ai préparé une action. Veuillez examiner l\'aperçu et confirmer pour exécuter.'
+          }
+        };
+        setChatMessages(prev => [...prev, assistantMessage]);
+        
+        // Save to chat history
+        addEntry({
+          prompt: userPrompt,
+          response: answer.message,
+          sessionId: currentSessionId || undefined
+        });
+      } else {
+        // Normal response (answer is now an object with { en, fr })
+        const assistantMessage = { 
+          type: 'assistant', 
+          content: answer // Store both en and fr
+        };
+        
+        // Add assistant response
+        setChatMessages(prev => [...prev, assistantMessage]);
 
-      const updatePattern = /(successfully updated|has been updated|mis à jour|a été mis à jour)/i;
-      const englishText = answer?.en || '';
-      const frenchText = answer?.fr || '';
-      if (updatePattern.test(englishText) || updatePattern.test(frenchText)) {
-        window.dispatchEvent(new CustomEvent(MATERIALS_RELOAD_EVENT));
+        const updatePattern = /(successfully updated|has been updated|mis à jour|a été mis à jour)/i;
+        const englishText = answer?.en || '';
+        const frenchText = answer?.fr || '';
+        if (updatePattern.test(englishText) || updatePattern.test(frenchText)) {
+          window.dispatchEvent(new CustomEvent(MATERIALS_RELOAD_EVENT));
+        }
+        
+        // Save to chat history (for Chat History page) - save both languages
+        addEntry({
+          prompt: userPrompt,
+          response: answer, // Save both en and fr
+          sessionId: currentSessionId || undefined
+        });
       }
-      
-      // Save to chat history (for Chat History page) - save both languages
-      addEntry({
-        prompt: userPrompt,
-        response: answer, // Save both en and fr
-        sessionId: currentSessionId || undefined
-      });
     } catch (err) {
       const errorMessage = err.message || t('assistantError');
       const errorMessageObj = { type: 'error', content: errorMessage };
@@ -281,6 +314,38 @@ function AIPanel() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  // Phase 5: Handle action confirmation
+  const handleConfirmAction = async (actionId) => {
+    try {
+      const result = await confirmAction(actionId);
+      
+      // Close preview modal
+      setPreviewModal(null);
+      
+      // Add confirmation message
+      const confirmationMessage = {
+        type: 'assistant',
+        content: {
+          en: 'Action confirmed and executed successfully.',
+          fr: 'Action confirmée et exécutée avec succès.'
+        }
+      };
+      setChatMessages(prev => [...prev, confirmationMessage]);
+      
+      // Reload materials data
+      window.dispatchEvent(new CustomEvent(MATERIALS_RELOAD_EVENT));
+      
+      return result;
+    } catch (error) {
+      console.error('Error confirming action:', error);
+      throw error;
+    }
+  };
+
+  const handleCancelPreview = () => {
+    setPreviewModal(null);
   };
 
   // Auto-scroll to bottom when new messages are added
@@ -417,6 +482,14 @@ function AIPanel() {
           </button>
         )}
       </div>
+      {/* Phase 5: Action Preview Modal */}
+      {previewModal && (
+        <ActionPreviewModal
+          preview={previewModal}
+          onConfirm={handleConfirmAction}
+          onCancel={handleCancelPreview}
+        />
+      )}
       <div className="ai-panel-content" ref={contentRef}>
         {chatMessages.length === 0 && !loading && (
           <div className="ai-panel-welcome">

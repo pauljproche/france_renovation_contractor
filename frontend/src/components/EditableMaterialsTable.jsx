@@ -606,6 +606,12 @@ export default function EditableMaterialsTable({ search }) {
       return;
     }
 
+    // TODO: Image extraction disabled - will implement manual upload in future
+    // Auto-extraction was causing 502 errors due to rate limiting/blocking
+    // Future: Allow users to upload images manually from local files or server
+    return;
+    
+    /* DISABLED - Manual upload coming soon
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
       const response = await fetch(`${API_BASE_URL}/api/extract-product-image`, {
@@ -628,6 +634,7 @@ export default function EditableMaterialsTable({ search }) {
     } catch (error) {
       console.error('Error fetching product image:', error);
     }
+    */
   };
 
   // Get all available columns (standard + custom)

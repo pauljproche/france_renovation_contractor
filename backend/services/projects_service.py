@@ -335,3 +335,4 @@ def delete_project(session: Session, project_id: str) -> bool:
     session.flush()
     
     return True
+

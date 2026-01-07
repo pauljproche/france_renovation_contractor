@@ -7,10 +7,15 @@ import json
 import re
 import httpx
 import logging
-from typing import Optional, Any, Tuple, List
+from typing import Optional, Any, Tuple, List, Dict
 from datetime import datetime
 from dotenv import load_dotenv
 
+# Configure logging to ensure messages appear in uvicorn logs
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s:%(name)s:%(message)s'
+)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -24,11 +29,13 @@ if USE_DATABASE:
         import services.materials_service as materials_service
         import services.projects_service as projects_service
         import services.workers_service as workers_service
+        import services.agent_tools as agent_tools
     except ImportError:
         from backend.db_session import db_session, db_readonly_session
         import backend.services.materials_service as materials_service
         import backend.services.projects_service as projects_service
         import backend.services.workers_service as workers_service
+        import backend.services.agent_tools as agent_tools
 else:
     # Dummy functions for when database is disabled
     db_session = None
@@ -36,6 +43,7 @@ else:
     materials_service = None
     projects_service = None
     workers_service = None
+    agent_tools = None
 
 # Path to materials.json
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -130,6 +138,295 @@ def write_materials_data(data: dict) -> None:
             logger.warning("JSON backup write failed, but DB write succeeded")
         else:
             raise  # Both failed
+
+
+def build_agent_tools() -> List[Dict[str, Any]]:
+    """
+    Build the list of agent tools.
+    
+    Phase 5: Includes new DB query tools and preview functions.
+    Keeps update_cell for backward compatibility during transition.
+    """
+    tools = []
+    
+    # Phase 5: New DB query tools (read-only, no confirmation needed)
+    if USE_DATABASE and agent_tools:
+        tools.extend([
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_items_needing_validation",
+                    "description": (
+                        "Query items that need validation for a specific role. "
+                        "Returns list of items with their current approval status. "
+                        "This is a READ-ONLY query - no confirmation needed."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "role": {
+                                "type": "string",
+                                "enum": ["client", "contractor"],
+                                "description": "Role to check validation for"
+                            },
+                            "project_id": {
+                                "type": "string",
+                                "description": "Optional project ID to filter by"
+                            }
+                        },
+                        "required": ["role"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_todo_items",
+                    "description": (
+                        "Query TODO items for a role (items needing validation, ordering, or delivery tracking). "
+                        "This is a READ-ONLY query - no confirmation needed."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "role": {
+                                "type": "string",
+                                "enum": ["client", "contractor"],
+                                "description": "Role to check TODO items for"
+                            },
+                            "project_id": {
+                                "type": "string",
+                                "description": "Optional project ID to filter by"
+                            }
+                        },
+                        "required": ["role"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "query_pricing_summary",
+                    "description": (
+                        "Get pricing summary (total TTC, total HT, item count). "
+                        "This is a READ-ONLY query - no confirmation needed."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "project_id": {
+                                "type": "string",
+                                "description": "Optional project ID to filter by"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_items",
+                    "description": (
+                        "Search items by product name. "
+                        "This is a READ-ONLY query - no confirmation needed."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "product_search": {
+                                "type": "string",
+                                "description": "Product name or partial name to search for"
+                            },
+                            "project_id": {
+                                "type": "string",
+                                "description": "Optional project ID to filter by"
+                            }
+                        },
+                        "required": ["product_search"]
+                    }
+                }
+            },
+            # Phase 5: Preview functions (require confirmation)
+            {
+                "type": "function",
+                "function": {
+                    "name": "preview_update_item_approval",
+                    "description": (
+                        "Preview updating an item's approval status. "
+                        "This generates a preview with SQL query and NLP interpretation. "
+                        "The action will NOT execute until the user confirms via the confirmation endpoint. "
+                        "Returns action_id that must be confirmed by user."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "item_id": {
+                                "type": "integer",
+                                "description": "Item ID to update"
+                            },
+                            "role": {
+                                "type": "string",
+                                "enum": ["client", "contractor"],
+                                "description": "Role whose approval status to update"
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": ["approved", "rejected", "change_order", "pending", "supplied_by"],
+                                "description": "New approval status"
+                            }
+                        },
+                        "required": ["item_id", "role", "status"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "preview_add_replacement_url",
+                    "description": (
+                        "Preview adding a replacement URL to an item's approval. "
+                        "This generates a preview - action requires user confirmation."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "item_id": {
+                                "type": "integer",
+                                "description": "Item ID"
+                            },
+                            "role": {
+                                "type": "string",
+                                "enum": ["client", "contractor"],
+                                "description": "Role whose approval to add URL to"
+                            },
+                            "url": {
+                                "type": "string",
+                                "description": "Replacement URL to add"
+                            }
+                        },
+                        "required": ["item_id", "role", "url"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "preview_remove_replacement_url",
+                    "description": (
+                        "Preview removing a replacement URL from an item's approval. "
+                        "This generates a preview - action requires user confirmation."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "item_id": {
+                                "type": "integer",
+                                "description": "Item ID"
+                            },
+                            "role": {
+                                "type": "string",
+                                "enum": ["client", "contractor"],
+                                "description": "Role whose approval to remove URL from"
+                            },
+                            "url": {
+                                "type": "string",
+                                "description": "Replacement URL to remove"
+                            }
+                        },
+                        "required": ["item_id", "role", "url"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "preview_update_item_field",
+                    "description": (
+                        "Preview updating an item field (price, product, reference). "
+                        "This generates a preview - action requires user confirmation."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "item_id": {
+                                "type": "integer",
+                                "description": "Item ID to update"
+                            },
+                            "field_name": {
+                                "type": "string",
+                                "enum": ["price_ttc", "price_ht_quote", "product", "reference"],
+                                "description": "Field name to update"
+                            },
+                            "new_value": {
+                                "description": "New value (number for prices, string for product/reference)",
+                                "anyOf": [
+                                    {"type": "number"},
+                                    {"type": "string"}
+                                ]
+                            },
+                            "expected_product_hint": {
+                                "type": "string",
+                                "description": "Optional product name hint for validation"
+                            }
+                        },
+                        "required": ["item_id", "field_name", "new_value"]
+                    }
+                }
+            }
+        ])
+    
+    # Keep update_cell for backward compatibility during transition
+    tools.append({
+        "type": "function",
+        "function": {
+            "name": "update_cell",
+            "description": (
+                "Update a single field in the materials table (LEGACY - use preview functions in Phase 5). "
+                "BEFORE calling this function, you MUST:\n"
+                "1. Find the item by matching product identifier from user's request to materials data\n"
+                "2. Verify the item's product name matches what user requested (identifier can be partial or exact match)\n"
+                "3. **CRITICAL**: Use the EXACT product name from the materials data (from the 'product' field) as the expected_product_hint\n"
+                "4. Read the current value from THAT specific item (for arrays, read the entire current array)\n"
+                "5. Modify the value appropriately\n"
+                "6. Verify section_id, item_index, and product name all match the correct item\n"
+                "**NOTE**: In Phase 5, prefer using preview_* functions which require user confirmation."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "section_id": {
+                        "type": "string",
+                        "description": "Section identifier, e.g. 'kitchen'."
+                    },
+                    "item_index": {
+                        "type": "integer",
+                        "description": "Zero-based index of the item within the section."
+                    },
+                    "field_path": {
+                        "type": "string",
+                        "description": (
+                            "Dot-delimited path to the field to update. "
+                            "Examples: 'price.ttc', 'approvals.client.status', 'order.delivery.date'."
+                        )
+                    },
+                    "new_value": {
+                        "description": "New value to set. Use the appropriate JSON type.",
+                        "anyOf": [
+                            {"type": "string"},
+                            {"type": "number"},
+                            {"type": "boolean"},
+                            {"type": "object"},
+                            {"type": "array", "items": {}},
+                            {"type": "null"}
+                        ]
+                    }
+                },
+                "required": ["section_id", "item_index", "field_path", "new_value"]
+            }
+        }
+    })
+    
+    return tools
 
 
 def load_system_prompt() -> str:
@@ -529,33 +826,50 @@ async def query_assistant(query: MaterialsQuery):
             status_code=503,
             detail="Assistant endpoint is unavailable because OPENAI_API_KEY is not configured."
         )
+    
+    # Log user query to file for tracking
     try:
-        # Serialize materials data for the prompt
+        logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+        os.makedirs(logs_dir, exist_ok=True)
+        query_log_file = os.path.join(logs_dir, 'user_queries.log')
+        
+        with open(query_log_file, 'a', encoding='utf-8') as f:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            f.write(f"{timestamp} | USER_QUERY: {query.prompt}\n")
+            if query.language:
+                f.write(f"{timestamp} | LANGUAGE: {query.language}\n")
+    except Exception as e:
+        logger.warning(f"Failed to log user query: {e}")
+    
+    try:
+        # Phase 5: Skip materials processing when using database (saves processing time and memory)
         materials_text = "No materials data provided."
-        if query.materials and query.materials.get("sections"):
-            sections_summary = []
-            for section in query.materials["sections"]:
-                section_data = {
-                    "section": section.get("label", ""),
-                    "sectionId": section.get("id", ""),
-                    "items": []
-                }
-                for idx, item in enumerate(section.get("items", [])):
-                    # Format item with product name prominently for easier identification
-                    item_data = {
-                        "index": idx,
-                        "product": item.get("product", ""),  # PRIMARY IDENTIFIER
-                        "reference": item.get("reference"),
-                        "laborType": item.get("laborType"),  # Task/Labor type
-                        "supplierLink": item.get("supplierLink"),  # Supplier URL
-                        "priceTTC": item.get("price", {}).get("ttc"),
-                        "approvals": item.get("approvals", {}),
-                        "order": item.get("order", {}),
-                        "comments": item.get("comments", {})  # Comments from client/cray
+        if not (USE_DATABASE and agent_tools):
+            # Only process materials if NOT using database tools
+            if query.materials and query.materials.get("sections"):
+                sections_summary = []
+                for section in query.materials["sections"]:
+                    section_data = {
+                        "section": section.get("label", ""),
+                        "sectionId": section.get("id", ""),
+                        "items": []
                     }
-                    section_data["items"].append(item_data)
-                sections_summary.append(section_data)
-            materials_text = json.dumps(sections_summary, indent=2, ensure_ascii=False)
+                    for idx, item in enumerate(section.get("items", [])):
+                        # Format item with product name prominently for easier identification
+                        item_data = {
+                            "index": idx,
+                            "product": item.get("product", ""),  # PRIMARY IDENTIFIER
+                            "reference": item.get("reference"),
+                            "laborType": item.get("laborType"),  # Task/Labor type
+                            "supplierLink": item.get("supplierLink"),  # Supplier URL
+                            "priceTTC": item.get("price", {}).get("ttc"),
+                            "approvals": item.get("approvals", {}),
+                            "order": item.get("order", {}),
+                            "comments": item.get("comments", {})  # Comments from client/cray
+                        }
+                        section_data["items"].append(item_data)
+                    sections_summary.append(section_data)
+                materials_text = json.dumps(sections_summary, indent=2, ensure_ascii=False)
 
         # Add custom table information if available
         custom_tables_info = ""
@@ -610,63 +924,24 @@ async def query_assistant(query: MaterialsQuery):
             else:
                 validation_instruction = "\n\n⚠️ CRITICAL INSTRUCTION: You MUST check EVERY item in EVERY section. Do not stop after finding one item. List ALL items that need validation (status: rejected, change_order, null, or any non-approved status). Count them carefully.\n\n"
         
-        user_content = f"Materials data:\n{materials_text}{custom_tables_info}{language_instruction}{validation_instruction}Question: {query.prompt}"
+        # Phase 5: Remove full materials dataset when DB tools are available
+        # This significantly reduces token usage and cost
+        if USE_DATABASE and agent_tools:
+            # Don't send full materials dataset - agent should use query tools
+            # Only send a minimal summary for context
+            materials_summary = "Materials data is available via database query tools. Use query_items_needing_validation(), query_todo_items(), query_pricing_summary(), or search_items() to access data."
+            user_content = f"Materials data: {materials_summary}\n{custom_tables_info}{language_instruction}{validation_instruction}Question: {query.prompt}"
+        else:
+            # Fallback: send full materials dataset when DB tools unavailable
+            user_content = f"Materials data:\n{materials_text}{custom_tables_info}{language_instruction}{validation_instruction}Question: {query.prompt}"
 
-        tools = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "update_cell",
-                    "description": (
-                        "Update a single field in the materials table. "
-                        "BEFORE calling this function, you MUST:\n"
-                        "1. Find the item by matching product identifier from user's request to materials data\n"
-                        "2. Verify the item's product name matches what user requested (identifier can be partial or exact match)\n"
-                        "3. **CRITICAL**: Use the EXACT product name from the materials data (from the 'product' field) as the expected_product_hint\n"
-                        "   - If user says 'demo_item', but the data has 'demo_item' (exact match), use 'demo_item'\n"
-                        "   - If user says 'cathat', but the data has 'Cathat Item Model X', use 'Cathat Item Model X' (the exact name from data)\n"
-                        "4. Read the current value from THAT specific item (for arrays, read the entire current array)\n"
-                        "5. Modify the value appropriately:\n"
-                        "   - Arrays: preserve all existing items unless removing, then add/remove only the specified item(s)\n"
-                        "   - Non-arrays: set to the new value\n"
-                        "6. Verify section_id, item_index, and product name all match the correct item\n"
-                        "Parameters: section_id (section identifier), item_index (zero-based), field_path (dot-delimited path like 'approvals.client.status'), new_value (complete modified value)."
-                    ),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "section_id": {
-                                "type": "string",
-                                "description": "Section identifier, e.g. 'kitchen'."
-                            },
-                            "item_index": {
-                                "type": "integer",
-                                "description": "Zero-based index of the item within the section."
-                            },
-                            "field_path": {
-                                "type": "string",
-                                "description": (
-                                    "Dot-delimited path to the field to update. "
-                                    "Examples: 'price.ttc', 'approvals.client.status', 'order.delivery.date'."
-                                )
-                            },
-                            "new_value": {
-                                "description": "New value to set. Use the appropriate JSON type.",
-                                "anyOf": [
-                                    {"type": "string"},
-                                    {"type": "number"},
-                                    {"type": "boolean"},
-                                    {"type": "object"},
-                                    {"type": "array", "items": {}},
-                                    {"type": "null"}
-                                ]
-                            }
-                        },
-                        "required": ["section_id", "item_index", "field_path", "new_value"]
-                    }
-                }
-            }
-        ]
+        tools = build_agent_tools()
+        
+        # Phase 5: Log tool availability for debugging
+        if USE_DATABASE and agent_tools:
+            query_tools = [t for t in tools if t.get("function", {}).get("name", "").startswith("query_")]
+            logger.info(f"🔍 Database query tools available: {len(query_tools)} tools")
+            logger.info(f"🔍 Query tools: {[t.get('function', {}).get('name') for t in query_tools]}")
 
         # Extract conversation context if present
         conversation_context = ""
@@ -690,7 +965,7 @@ async def query_assistant(query: MaterialsQuery):
             if conversation_context:
                 logger.info(f"Conversation context preview: {conversation_context[:200]}...")
         
-        if is_confirmation and query.materials:
+        if is_confirmation and (query.materials or (USE_DATABASE and agent_tools)):
             # This is a confirmation - extract what was originally requested from conversation context
             product_hint = None
             operation = None
@@ -937,6 +1212,14 @@ async def query_assistant(query: MaterialsQuery):
 
         response_message = response.choices[0].message
 
+        # Phase 5: Log whether agent is using tools
+        if response_message.tool_calls:
+            logger.info(f"🔍 Agent made {len(response_message.tool_calls)} tool call(s)")
+            for tc in response_message.tool_calls:
+                logger.info(f"🔍 Tool call: {tc.function.name}")
+        else:
+            logger.warning("⚠️ Agent did NOT use any tools - answering from prompt context only")
+
         if response_message.tool_calls:
             messages.append({
                 "role": "assistant",
@@ -946,9 +1229,136 @@ async def query_assistant(query: MaterialsQuery):
 
             for tool_call in response_message.tool_calls:
                 function_name = tool_call.function.name
-                if function_name != "update_cell":
-                    tool_response_content = json.dumps({"error": f"Unknown tool {function_name}"})
-                else:
+                
+                # Phase 5: Handle new agent tools
+                if USE_DATABASE and agent_tools:
+                    if function_name == "query_items_needing_validation":
+                        logger.info(f"🔍 Agent using query tool: query_items_needing_validation")
+                        try:
+                            arguments = json.loads(tool_call.function.arguments)
+                            role = arguments.get("role", "client")
+                            project_id = arguments.get("project_id")
+                            logger.info(f"🔍 Query tool called with role={role}, project_id={project_id}")
+                            results = agent_tools.query_items_needing_validation(role, project_id)
+                            logger.info(f"🔍 Query tool returned {len(results)} items")
+                            tool_response_content = json.dumps({
+                                "status": "success",
+                                "results": results,
+                                "count": len(results)
+                            })
+                        except Exception as e:
+                            logger.error(f"Error in query_items_needing_validation: {e}")
+                            tool_response_content = json.dumps({"error": str(e)})
+                    
+                    elif function_name == "query_todo_items":
+                        try:
+                            arguments = json.loads(tool_call.function.arguments)
+                            role = arguments.get("role", "client")
+                            project_id = arguments.get("project_id")
+                            results = agent_tools.query_todo_items(role, project_id)
+                            tool_response_content = json.dumps({
+                                "status": "success",
+                                "results": results,
+                                "count": len(results)
+                            })
+                        except Exception as e:
+                            logger.error(f"Error in query_todo_items: {e}")
+                            tool_response_content = json.dumps({"error": str(e)})
+                    
+                    elif function_name == "query_pricing_summary":
+                        try:
+                            arguments = json.loads(tool_call.function.arguments)
+                            project_id = arguments.get("project_id")
+                            result = agent_tools.query_pricing_summary(project_id)
+                            tool_response_content = json.dumps({
+                                "status": "success",
+                                "result": result
+                            })
+                        except Exception as e:
+                            logger.error(f"Error in query_pricing_summary: {e}")
+                            tool_response_content = json.dumps({"error": str(e)})
+                    
+                    elif function_name == "search_items":
+                        try:
+                            arguments = json.loads(tool_call.function.arguments)
+                            product_search = arguments.get("product_search", "")
+                            project_id = arguments.get("project_id")
+                            results = agent_tools.search_items(product_search, project_id)
+                            logger.info(f"🔍 search_items returned {len(results)} results")
+                            if results:
+                                logger.info(f"🔍 First result: item_id={results[0].get('item_id')}, product={results[0].get('product')}")
+                            tool_response_content = json.dumps({
+                                "status": "success",
+                                "results": results,
+                                "count": len(results),
+                                "instruction": "If this search was for a validation action, you MUST now call preview_update_item_approval with the item_id from the first result."
+                            })
+                        except Exception as e:
+                            logger.error(f"Error in search_items: {e}")
+                            tool_response_content = json.dumps({"error": str(e)})
+                    
+                    # Phase 5: Preview functions (return preview, don't execute)
+                    elif function_name == "preview_update_item_approval":
+                        try:
+                            arguments = json.loads(tool_call.function.arguments)
+                            item_id = arguments.get("item_id")
+                            role = arguments.get("role")
+                            status = arguments.get("status")
+                            user_role = arguments.get("user_role")
+                            logger.info(f"🔍 Preview function called: preview_update_item_approval(item_id={item_id}, role={role}, status={status})")
+                            result = agent_tools.preview_update_item_approval(item_id, role, status, user_role)
+                            tool_response_content = json.dumps(result)
+                            logger.info(f"🔍 Preview generated: action_id={result.get('action_id')}, action={result.get('preview', {}).get('action')}")
+                        except Exception as e:
+                            logger.error(f"Error in preview_update_item_approval: {e}")
+                            tool_response_content = json.dumps({"error": str(e)})
+                    
+                    elif function_name == "preview_add_replacement_url":
+                        try:
+                            arguments = json.loads(tool_call.function.arguments)
+                            item_id = arguments.get("item_id")
+                            role = arguments.get("role")
+                            url = arguments.get("url")
+                            result = agent_tools.preview_add_replacement_url(item_id, role, url)
+                            tool_response_content = json.dumps(result)
+                        except Exception as e:
+                            logger.error(f"Error in preview_add_replacement_url: {e}")
+                            tool_response_content = json.dumps({"error": str(e)})
+                    
+                    elif function_name == "preview_remove_replacement_url":
+                        try:
+                            arguments = json.loads(tool_call.function.arguments)
+                            item_id = arguments.get("item_id")
+                            role = arguments.get("role")
+                            url = arguments.get("url")
+                            result = agent_tools.preview_remove_replacement_url(item_id, role, url)
+                            tool_response_content = json.dumps(result)
+                        except Exception as e:
+                            logger.error(f"Error in preview_remove_replacement_url: {e}")
+                            tool_response_content = json.dumps({"error": str(e)})
+                    
+                    elif function_name == "preview_update_item_field":
+                        try:
+                            arguments = json.loads(tool_call.function.arguments)
+                            item_id = arguments.get("item_id")
+                            field_name = arguments.get("field_name")
+                            new_value = arguments.get("new_value")
+                            expected_product_hint = arguments.get("expected_product_hint")
+                            result = agent_tools.preview_update_item_field(item_id, field_name, new_value, expected_product_hint)
+                            tool_response_content = json.dumps(result)
+                        except Exception as e:
+                            logger.error(f"Error in preview_update_item_field: {e}")
+                            tool_response_content = json.dumps({"error": str(e)})
+                    
+                    # Legacy update_cell (backward compatibility)
+                    elif function_name == "update_cell":
+                        # Fall through to existing update_cell logic below
+                        pass
+                    else:
+                        tool_response_content = json.dumps({"error": f"Unknown tool {function_name}"})
+                
+                # Legacy update_cell handling (keep for backward compatibility)
+                if function_name == "update_cell":
                     try:
                         arguments = json.loads(tool_call.function.arguments)
                     except json.JSONDecodeError as exc:
@@ -1277,18 +1687,56 @@ async def query_assistant(query: MaterialsQuery):
             final_message = final_response.choices[0].message
             answer = final_message.content
             
-            # Check if any tool responses flagged suspicious activity
+            # Phase 5: Check if any tool responses contain preview (requires confirmation)
+            preview_response = None
             for msg in messages:
                 if msg.get("role") == "tool":
                     try:
                         tool_result = json.loads(msg.get("content", "{}"))
-                        if tool_result.get("suspicious"):
+                        # Check if this is a preview response
+                        if tool_result.get("status") == "requires_confirmation":
+                            preview_response = {
+                                "preview": tool_result.get("preview"),
+                                "action_id": tool_result.get("action_id")
+                            }
+                            logger.info(f"🔍 Preview response detected: action_id={tool_result.get('action_id')}, action={tool_result.get('preview', {}).get('action')}")
+                            break  # Use first preview found
+                        # Check for suspicious activity
+                        elif tool_result.get("suspicious"):
                             # Add warning to answer if not already present
-                            if "⚠️" not in answer and "WARNING" not in answer.upper():
+                            if answer and "⚠️" not in answer and "WARNING" not in answer.upper():
                                 warning = "\n\n⚠️ WARNING: The update completed, but there may be an issue. Please verify the result."
                                 answer = answer + warning if answer else warning
                     except:
                         pass
+            
+            # If preview found, return preview response instead of normal answer
+            if preview_response:
+                # Log preview response
+                try:
+                    logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+                    os.makedirs(logs_dir, exist_ok=True)
+                    response_log_file = os.path.join(logs_dir, 'user_queries_responses.log')
+                    with open(response_log_file, 'a', encoding='utf-8') as f:
+                        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        f.write(f"{timestamp} | USER_QUERY: {query.prompt}\n")
+                        f.write(f"{timestamp} | RESPONSE_TYPE: preview\n")
+                        f.write(f"{timestamp} | ACTION_ID: {preview_response.get('action_id')}\n")
+                        f.write(f"{timestamp} | ACTION: {preview_response.get('preview', {}).get('action', 'N/A')}\n")
+                        f.write(f"{timestamp} | ITEM: {preview_response.get('preview', {}).get('item_product', 'N/A')}\n")
+                        f.write(f"{timestamp} | NLP: {preview_response.get('preview', {}).get('nlp', 'N/A')}\n")
+                        f.write(f"{timestamp} | ---\n")
+                except Exception as log_err:
+                    logger.warning(f"Failed to log preview response: {log_err}")
+                
+                return {
+                    "preview": preview_response["preview"],
+                    "action_id": preview_response["action_id"],
+                    "message": {
+                        "en": "I've prepared an action. Please review the preview and confirm to execute.",
+                        "fr": "J'ai préparé une action. Veuillez examiner l'aperçu et confirmer pour exécuter."
+                    }
+                }
         else:
             answer = response_message.content
 
@@ -1344,6 +1792,21 @@ async def query_assistant(query: MaterialsQuery):
                 french_answer = french_part
                 english_answer = french_part  # Fallback: use French for both (shouldn't happen)
 
+        # Log regular response
+        try:
+            logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+            os.makedirs(logs_dir, exist_ok=True)
+            response_log_file = os.path.join(logs_dir, 'user_queries_responses.log')
+            with open(response_log_file, 'a', encoding='utf-8') as f:
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                f.write(f"{timestamp} | USER_QUERY: {query.prompt}\n")
+                f.write(f"{timestamp} | RESPONSE_TYPE: text\n")
+                f.write(f"{timestamp} | ANSWER_EN: {english_answer[:200]}...\n")  # First 200 chars
+                f.write(f"{timestamp} | ANSWER_FR: {french_answer[:200]}...\n")  # First 200 chars
+                f.write(f"{timestamp} | ---\n")
+        except Exception as log_err:
+            logger.warning(f"Failed to log response: {log_err}")
+        
         return {
             "answer": english_answer,
             "answer_fr": french_answer
@@ -1514,6 +1977,23 @@ async def extract_product_image(request: ImageExtractionRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Error extracting product image: {str(e)}"
+        )
+
+
+@app.get("/api/materials")
+async def get_materials():
+    """
+    Get materials data from database or JSON file.
+    Returns data in the same format as materials.json for frontend compatibility.
+    """
+    try:
+        data = load_materials_data()
+        return data
+    except Exception as e:
+        logger.error(f"Error loading materials data: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error loading materials data: {str(e)}"
         )
 
 
@@ -1907,6 +2387,64 @@ async def delete_worker(worker_id: str):
             status_code=500,
             detail=f"Error deleting worker: {str(e)}"
         )
+
+
+# ============================================================================
+# Phase 5: Agent Action Confirmation Endpoint
+# ============================================================================
+
+class ActionConfirmationRequest(BaseModel):
+    action_id: str
+
+
+@app.post("/api/assistant/confirm-action")
+async def confirm_action(request: ActionConfirmationRequest):
+    """
+    Confirm and execute a stored action preview.
+    
+    This endpoint is called by the frontend after the user reviews the preview
+    and confirms they want to execute the action.
+    """
+    if not USE_DATABASE or agent_tools is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Agent tools are only available when database is enabled"
+        )
+    
+    try:
+        result = agent_tools.execute_confirmed_action(request.action_id)
+        return {
+            "status": "success",
+            "result": result
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error executing confirmed action: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error executing action: {str(e)}"
+        )
+
+
+@app.get("/api/assistant/preview/{action_id}")
+async def get_action_preview(action_id: str):
+    """
+    Get stored action preview by ID.
+    
+    Used by frontend to display preview before confirmation.
+    """
+    if not USE_DATABASE or agent_tools is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Agent tools are only available when database is enabled"
+        )
+    
+    preview = agent_tools.get_action_preview(action_id)
+    if not preview:
+        raise HTTPException(status_code=404, detail="Action preview not found or expired")
+    
+    return preview
 
 
 if __name__ == "__main__":

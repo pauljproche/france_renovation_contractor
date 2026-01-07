@@ -25,7 +25,9 @@ function LLMRequestForm({ materials }) {
     setResponse('');
 
     try {
-      const answer = await queryMaterialsAssistant({ prompt: userPrompt, materials, language });
+      // Phase 5: Don't send full materials dataset when using database
+      // Backend will use query tools instead, reducing token usage
+      const answer = await queryMaterialsAssistant({ prompt: userPrompt, materials: {}, language });
       setResponse(answer);
       setPrompt(''); // Clear the input after successful submission
       
