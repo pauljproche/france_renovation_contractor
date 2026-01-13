@@ -22,8 +22,16 @@ log() {
 
 log "Starting JSON backup export..."
 
+# Determine Python executable (prefer venv Python)
+PYTHON_CMD="python3"
+if [ -f "backend/venv/bin/python3" ]; then
+    PYTHON_CMD="backend/venv/bin/python3"
+elif [ -f "venv/bin/python3" ]; then
+    PYTHON_CMD="venv/bin/python3"
+fi
+
 # Check if database is accessible
-if ! python3 -c "
+if ! "$PYTHON_CMD" -c "
 import os
 os.chdir('backend')
 from dotenv import load_dotenv
@@ -35,14 +43,6 @@ if not use_db:
 " 2>&1 | tee -a "$LOG_FILE"; then
     log "ERROR: USE_DATABASE is not enabled. Skipping backup."
     exit 1
-fi
-
-# Determine Python executable (prefer venv Python)
-PYTHON_CMD="python3"
-if [ -f "backend/venv/bin/python3" ]; then
-    PYTHON_CMD="backend/venv/bin/python3"
-elif [ -f "venv/bin/python3" ]; then
-    PYTHON_CMD="venv/bin/python3"
 fi
 
 # Verify Python can import required modules
