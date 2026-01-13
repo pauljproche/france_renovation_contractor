@@ -44,6 +44,12 @@ elif [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
 fi
 
+# Verify Python can import required modules
+if ! python3 -c "import sqlalchemy" 2>/dev/null; then
+    log "ERROR: sqlalchemy not found. Make sure virtual environment is activated."
+    exit 1
+fi
+
 # Run export script
 if python3 backend/scripts/migrate_db_to_json.py --output-dir data/ 2>&1 | tee -a "$LOG_FILE"; then
     log "✅ JSON backup export completed successfully"
