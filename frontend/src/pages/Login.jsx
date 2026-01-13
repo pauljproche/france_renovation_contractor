@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useLanguage } from '../contexts/AppContext.jsx';
 import { useChatHistory } from '../contexts/ChatHistoryContext.jsx';
@@ -46,36 +46,59 @@ export default function Login() {
     clearHistory();
   }, [clearHistory]); // Run once on mount
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     
-    // Simple authentication - in production, this would check against a database
-    if (username && password) {
-      setLoading(true);
-      
-      // Store auth state (in production, use proper auth tokens)
+    if (!username || !password) {
+      setError('Please enter both email and password');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/api/users/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: username,
+          password: password,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Invalid email or password' }));
+        throw new Error(errorData.detail || 'Invalid email or password');
+      }
+
+      const data = await response.json();
+      const user = data.user;
+
+      // Store auth state
       sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('username', username);
+      sessionStorage.setItem('username', user.email);
+      sessionStorage.setItem('userId', user.id);
+      sessionStorage.setItem('userRole', user.role);
       sessionStorage.setItem('justLoggedIn', 'true');
       
       // Clear any existing project data to give each user a fresh dashboard
-      // In production, this would be user-specific data from a database
       localStorage.removeItem('renovationProjects');
       localStorage.removeItem('convertedDemoProjects');
       localStorage.removeItem('selectedProjectId');
-      // Clear hiddenFromRegularDemos so main demo shows in regular projects by default
       localStorage.removeItem('hiddenFromRegularDemos');
       
       // Clear chat history on login
       clearHistory();
       
-      // Add 1.5 second delay before navigating to projects dashboard
-      setTimeout(() => {
-        navigate('/global-dashboard');
-      }, 1500);
-    } else {
-      setError('Please enter both username and password');
+      // Navigate to projects dashboard
+      navigate('/global-dashboard');
+    } catch (err) {
+      setError(err.message || 'Login failed. Please try again.');
+      setLoading(false);
     }
   };
 
@@ -97,13 +120,13 @@ export default function Login() {
           
           <form onSubmit={handleSubmit} className="login-form">
             <div className="form-group">
-              <label htmlFor="username">{t('loginUsername')}</label>
+              <label htmlFor="username">Email</label>
               <input
-                type="text"
+                type="email"
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={t('loginUsernamePlaceholder')}
+                placeholder="Enter your email"
               />
             </div>
             
@@ -123,6 +146,13 @@ export default function Login() {
             <button type="submit" className="login-submit-btn" disabled={loading}>
               {loading ? t('loginSigningIn') : t('loginButton')}
             </button>
+
+            <p style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.875rem' }}>
+              Don't have an account?{' '}
+              <Link to="/signup" style={{ color: '#007bff', textDecoration: 'none' }}>
+                Sign up
+              </Link>
+            </p>
           </form>
         </div>
       </div>

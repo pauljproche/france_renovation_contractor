@@ -51,12 +51,12 @@ export default function Landing() {
           </p>
           
           <div className="landing-cta">
-            <Link to="/login" className="cta-button primary">
+            <Link to="/signup" className="cta-button primary">
               {t('landingGetStarted')}
             </Link>
-            <a href="#learn-more" className="cta-button secondary">
-              {t('landingLearnMore')}
-            </a>
+            <Link to="/login" className="cta-button secondary">
+              Log In
+            </Link>
           </div>
         </div>
       </div>

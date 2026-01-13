@@ -74,7 +74,26 @@ const saveCustomRoles = (roles) => {
 };
 
 export function RoleProvider({ children }) {
-  const [role, setRole] = useState(ROLES.CONTRACTOR);
+  // Load role from sessionStorage if user is authenticated, otherwise default to contractor
+  const [role, setRole] = useState(() => {
+    const savedRole = sessionStorage.getItem('userRole');
+    if (savedRole) {
+      // If role is 'admin', return it directly (admin can access everything)
+      if (savedRole === 'admin') {
+        return 'admin';
+      }
+      // Map database roles to ROLES constants
+      const roleMap = {
+        'contractor': ROLES.CONTRACTOR,
+        'client': ROLES.CLIENT,
+        'architect': ROLES.ARCHITECT,
+        'worker': ROLES.CONTRACTOR, // Workers have contractor-level access
+        'subcontractor': ROLES.CONTRACTOR, // Subcontractors have contractor-level access
+      };
+      return roleMap[savedRole] || ROLES.CONTRACTOR;
+    }
+    return ROLES.CONTRACTOR;
+  });
   const [customRoles, setCustomRoles] = useState(() => loadCustomRoles());
 
   // Add a new custom role

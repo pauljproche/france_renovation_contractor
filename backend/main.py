@@ -30,12 +30,14 @@ if USE_DATABASE:
         import services.projects_service as projects_service
         import services.workers_service as workers_service
         import services.agent_tools as agent_tools
+        import services.users_service as users_service
     except ImportError:
         from backend.db_session import db_session, db_readonly_session
         import backend.services.materials_service as materials_service
         import backend.services.projects_service as projects_service
         import backend.services.workers_service as workers_service
         import backend.services.agent_tools as agent_tools
+        import backend.services.users_service as users_service
 else:
     # Dummy functions for when database is disabled
     db_session = None
@@ -44,6 +46,7 @@ else:
     projects_service = None
     workers_service = None
     agent_tools = None
+    users_service = None
 
 # Path to materials.json
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -798,6 +801,23 @@ class EditLogRequest(BaseModel):
     old_value: Any
     new_value: Any
     source: str = "manual"
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    role: str
+
+
+class UserUpdate(BaseModel):
+    email: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
 
 
 @app.get("/")
@@ -2230,9 +2250,16 @@ class ProjectUpdate(BaseModel):
 
 
 @app.get("/api/projects")
-async def get_projects():
+async def get_projects(user_id: Optional[str] = None):
     """
     Get all projects from database.
+    
+    If user_id is provided (via query parameter), only returns projects where:
+    - User is the owner, OR
+    - User is a member
+    
+    If user_id is not provided, returns all projects (for admin/backward compatibility).
+    
     Returns 501 if database not enabled (frontend should use localStorage fallback).
     """
     use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
@@ -2245,7 +2272,7 @@ async def get_projects():
     
     try:
         with db_readonly_session() as session:
-            projects = projects_service.get_all_projects(session)
+            projects = projects_service.get_all_projects(session, user_id=user_id)
             return {"projects": projects, "count": len(projects)}
     except Exception as e:
         logger.error(f"Error getting projects: {e}")
@@ -2283,8 +2310,13 @@ async def get_project(project_id: str):
 
 
 @app.post("/api/projects")
-async def create_project(project: ProjectCreate):
-    """Create a new project."""
+async def create_project(project: ProjectCreate, user_id: Optional[str] = None):
+    """
+    Create a new project.
+    
+    If user_id is provided (via query parameter), sets that user as the owner.
+    Otherwise, uses default migration user.
+    """
     use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
     
     if not use_database:
@@ -2298,7 +2330,18 @@ async def create_project(project: ProjectCreate):
         project_data["id"] = f"project-{datetime.utcnow().timestamp() * 1000:.0f}"
         
         with db_session() as session:
-            created_project = projects_service.create_project(session, project_data)
+            # Get owner user if user_id provided
+            owner_user = None
+            if user_id:
+                try:
+                    from backend.models import User
+                    owner_user = session.query(User).filter(User.id == user_id).first()
+                    if not owner_user:
+                        logger.warning(f"User {user_id} not found, using default user")
+                except Exception as e:
+                    logger.warning(f"Error fetching user {user_id}: {e}, using default user")
+            
+            created_project = projects_service.create_project(session, project_data, owner_user=owner_user)
             return created_project
     except Exception as e:
         logger.error(f"Error creating project: {e}")
@@ -2575,6 +2618,265 @@ async def get_action_preview(action_id: str):
         raise HTTPException(status_code=404, detail="Action preview not found or expired")
     
     return preview
+
+
+# ============================================================================
+# USER MANAGEMENT ENDPOINTS (Admin Only)
+# ============================================================================
+
+@app.get("/api/users")
+async def get_users():
+    """
+    Get all users (admin only).
+    Returns list of users with their information (passwords are never returned).
+    """
+    if not USE_DATABASE or users_service is None:
+        raise HTTPException(
+            status_code=501,
+            detail="User management is only available when database is enabled"
+        )
+    
+    try:
+        with db_readonly_session() as session:
+            users = users_service.get_all_users(session)
+            return {"users": users, "count": len(users)}
+    except Exception as e:
+        logger.error(f"Error getting users: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting users: {str(e)}"
+        )
+
+
+@app.get("/api/users/roles")
+async def get_user_roles():
+    """
+    Get list of available user roles.
+    """
+    if not USE_DATABASE or users_service is None:
+        raise HTTPException(
+            status_code=501,
+            detail="User management is only available when database is enabled"
+        )
+    
+    try:
+        roles = users_service.get_user_roles()
+        return {"roles": roles}
+    except Exception as e:
+        logger.error(f"Error getting roles: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting roles: {str(e)}"
+        )
+
+
+@app.post("/api/users/login")
+async def login_user(credentials: UserLogin):
+    """
+    Authenticate a user and return user info (including role).
+    """
+    if not USE_DATABASE or users_service is None:
+        raise HTTPException(
+            status_code=501,
+            detail="User authentication is only available when database is enabled"
+        )
+    
+    try:
+        with db_readonly_session() as session:
+            user = users_service.authenticate_user(session, credentials.email, credentials.password)
+            if not user:
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+            
+            # Update last login
+            with db_session() as update_session:
+                users_service.update_last_login(update_session, user['id'])
+            
+            return {
+                "user": user,
+                "status": "success"
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during login: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error during login: {str(e)}"
+        )
+
+
+@app.get("/api/users/{user_id}")
+async def get_user(user_id: str):
+    """
+    Get a single user by ID (admin only).
+    """
+    if not USE_DATABASE or users_service is None:
+        raise HTTPException(
+            status_code=501,
+            detail="User management is only available when database is enabled"
+        )
+    
+    try:
+        with db_readonly_session() as session:
+            user = users_service.get_user(session, user_id)
+            if not user:
+                raise HTTPException(status_code=404, detail=f"User '{user_id}' not found")
+            return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting user: {str(e)}"
+        )
+
+
+@app.post("/api/users/signup")
+async def signup_user(user_data: UserCreate):
+    """
+    Public sign-up endpoint for new users.
+    Users can only sign up with non-admin roles (client, contractor, worker, subcontractor).
+    """
+    if not USE_DATABASE or users_service is None:
+        raise HTTPException(
+            status_code=501,
+            detail="User sign-up is only available when database is enabled"
+        )
+    
+    # Prevent public sign-up with admin role
+    if user_data.role.lower() == 'admin':
+        raise HTTPException(
+            status_code=403,
+            detail="Admin accounts can only be created by existing admins"
+        )
+    
+    try:
+        with db_session() as session:
+            user = users_service.create_user(
+                session=session,
+                email=user_data.email,
+                password=user_data.password,
+                role=user_data.role
+            )
+            return user
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error during sign-up: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating account: {str(e)}"
+        )
+
+
+@app.post("/api/users")
+async def create_user_endpoint(user_data: UserCreate):
+    """
+    Create a new user (admin only).
+    """
+    if not USE_DATABASE or users_service is None:
+        raise HTTPException(
+            status_code=501,
+            detail="User management is only available when database is enabled"
+        )
+    
+    try:
+        with db_session() as session:
+            user = users_service.create_user(
+                session=session,
+                email=user_data.email,
+                password=user_data.password,
+                role=user_data.role
+            )
+            return user
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating user: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating user: {str(e)}"
+        )
+
+
+@app.put("/api/users/{user_id}")
+async def update_user_endpoint(user_id: str, user_data: UserUpdate):
+    """
+    Update a user (admin only).
+    """
+    if not USE_DATABASE or users_service is None:
+        raise HTTPException(
+            status_code=501,
+            detail="User management is only available when database is enabled"
+        )
+    
+    try:
+        with db_session() as session:
+            user = users_service.update_user(
+                session=session,
+                user_id=user_id,
+                email=user_data.email,
+                password=user_data.password,
+                role=user_data.role
+            )
+            return user
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating user: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating user: {str(e)}"
+        )
+
+
+@app.delete("/api/users/{user_id}")
+async def delete_user_endpoint(user_id: str):
+    """
+    Delete a user (admin only).
+    Cannot delete the last admin user.
+    """
+    if not USE_DATABASE or users_service is None:
+        raise HTTPException(
+            status_code=501,
+            detail="User management is only available when database is enabled"
+        )
+    
+    try:
+        with db_session() as session:
+            users_service.delete_user(session, user_id)
+            return {"message": "User deleted successfully", "status": "ok"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting user: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting user: {str(e)}"
+        )
+
+
+@app.get("/api/users/roles")
+async def get_user_roles():
+    """
+    Get list of available user roles.
+    """
+    if not USE_DATABASE or users_service is None:
+        raise HTTPException(
+            status_code=501,
+            detail="User management is only available when database is enabled"
+        )
+    
+    try:
+        roles = users_service.get_user_roles()
+        return {"roles": roles}
+    except Exception as e:
+        logger.error(f"Error getting roles: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting roles: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

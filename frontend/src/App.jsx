@@ -8,6 +8,7 @@ import Layout from './components/Layout.jsx';
 import ProtectedTrackingRoute from './components/ProtectedTrackingRoute.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
+import SignUp from './pages/SignUp.jsx';
 import GlobalDashboard from './pages/GlobalDashboard.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Materials from './pages/Materials.jsx';
@@ -15,6 +16,7 @@ import ChatHistory from './pages/ChatHistory.jsx';
 import Settings from './pages/Settings.jsx';
 import Timeline from './pages/Timeline.jsx';
 import Workers from './pages/Workers.jsx';
+import Admin from './pages/Admin.jsx';
 import ClientValidation from './pages/ClientValidation.jsx';
 import ClientMaterials from './pages/ClientMaterials.jsx';
 import EditHistory from './pages/EditHistory.jsx';
@@ -34,9 +36,11 @@ function App() {
                 <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
                 <Route element={<Layout />}>
                   <Route path="/global-dashboard" element={<GlobalDashboard />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/admin" element={<Admin />} />
                   <Route path="/timeline" element={<Timeline />} />
                   <Route path="/workers" element={<Workers />} />
                   <Route path="/dashboard" element={

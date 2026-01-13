@@ -815,5 +815,82 @@
     "old_value": "rejected",
     "new_value": "approved",
     "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-13T17:21:44.927361Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "reference",
+    "old_value": null,
+    "new_value": "[yoyoyo",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-13T17:22:00.648274Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 4,
+    "product": "beegcat",
+    "field_path": "reference",
+    "old_value": null,
+    "new_value": "232323",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-13T18:51:31.873767Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 4,
+    "product": "beegcat",
+    "field_path": "reference",
+    "old_value": null,
+    "new_value": "4444444",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-13T18:51:45.755589Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 5,
+    "product": "demo_item",
+    "field_path": "reference",
+    "old_value": null,
+    "new_value": "232323",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-13T18:51:50.447195Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "reference",
+    "old_value": null,
+    "new_value": "yoyoyo",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-13T19:33:43.608722Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "reference",
+    "old_value": "\"sink_ref_2\"",
+    "new_value": "\"sink_ref_2",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-13T19:33:49.174127Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "reference",
+    "old_value": "\"sink_ref_2",
+    "new_value": "sink_ref_2",
+    "source": "manual"
   }
 ]

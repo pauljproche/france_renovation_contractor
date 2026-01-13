@@ -292,7 +292,15 @@ export function ProjectsProvider({ children }) {
     async function loadProjects() {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/api/projects`);
+        // Get user ID from sessionStorage (set during login)
+        const userId = sessionStorage.getItem('userId');
+        
+        // Build URL with user_id parameter if available
+        const url = userId 
+          ? `${API_BASE_URL}/api/projects?user_id=${encodeURIComponent(userId)}`
+          : `${API_BASE_URL}/api/projects`;
+        
+        const response = await fetch(url);
         if (response.ok) {
           const data = await response.json();
           const apiProjects = data.projects || [];
@@ -420,7 +428,15 @@ export function ProjectsProvider({ children }) {
     
     // Try API first
     try {
-      const response = await fetch(`${API_BASE_URL}/api/projects`, {
+      // Get user ID from sessionStorage (set during login)
+      const userId = sessionStorage.getItem('userId');
+      
+      // Build URL with user_id parameter if available
+      const url = userId 
+        ? `${API_BASE_URL}/api/projects?user_id=${encodeURIComponent(userId)}`
+        : `${API_BASE_URL}/api/projects`;
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newProject)

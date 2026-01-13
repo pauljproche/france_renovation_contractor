@@ -16,8 +16,8 @@
           "approvals": {
             "client": {
               "status": "approved",
-              "note": null,
-              "validatedAt": "2025-12-16T19:56:52.376Z",
+              "note": "Phase6 test 1768330249",
+              "validatedAt": "2025-12-16T19:56:52.376000Z",
               "replacementUrls": [
                 "hellocat123",
                 "weeeee",
@@ -26,7 +26,9 @@
             },
             "cray": {
               "status": "approved",
-              "note": null
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
             }
           },
           "order": {
@@ -39,10 +41,9 @@
             "quantity": 1
           },
           "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Alexis Roche Paris Apt"
+            "client": null,
+            "cray": null
+          }
         },
         {
           "product": "Évier Grohe K700",
@@ -56,7 +57,7 @@
             "client": {
               "status": "alternative",
               "note": "ok avenant",
-              "validatedAt": "2025-12-02T21:54:31.130Z",
+              "validatedAt": "2025-12-02T21:54:31.130000Z",
               "replacementUrls": [
                 "sdfsdfsd",
                 "bear_url"
@@ -64,7 +65,9 @@
             },
             "cray": {
               "status": "approved",
-              "note": null
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
             }
           },
           "order": {
@@ -77,10 +80,9 @@
             "quantity": 1
           },
           "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Alexis Roche Paris Apt"
+            "client": null,
+            "cray": null
+          }
         },
         {
           "product": "Suspension Estiluz Volta (T-3536-W, noir, LED 2700K, 3×565 lm, 86.7×54.3 cm)",
@@ -94,11 +96,14 @@
             "client": {
               "status": "approved",
               "note": null,
-              "validatedAt": "2025-11-07T19:00:05.143Z"
+              "validatedAt": "2025-11-07T19:00:05.143000Z",
+              "replacementUrls": []
             },
             "cray": {
               "status": "approved",
-              "note": "non validé"
+              "note": "non validé",
+              "validatedAt": null,
+              "replacementUrls": []
             }
           },
           "order": {
@@ -111,17 +116,15 @@
             "quantity": 1
           },
           "comments": {
-            "cray": "non validé",
-            "client": null
+            "client": null,
+            "cray": "non validé"
           },
-          "laborType": "Façade, Couverture & ITE",
-          "chantier": "Alexis Roche Paris Apt"
+          "laborType": "Façade, Couverture & ITE"
         },
         {
           "product": "cathat",
           "reference": "5555555",
           "supplierLink": null,
-          "laborType": "Démolition & Dépose",
           "price": {
             "ttc": null,
             "htQuote": null
@@ -130,16 +133,13 @@
             "client": {
               "status": "approved",
               "note": null,
-              "validatedAt": "2025-12-02T23:43:10.058Z",
+              "validatedAt": "2025-12-02T23:43:10.058000Z",
               "replacementUrls": [
                 "hellocat123",
                 "cathat_alt_1_url"
               ]
             },
-            "cray": {
-              "status": null,
-              "note": null
-            }
+            "cray": {}
           },
           "order": {
             "ordered": false,
@@ -151,16 +151,15 @@
             "quantity": null
           },
           "comments": {
-            "cray": null,
-            "client": null
+            "client": null,
+            "cray": null
           },
-          "chantier": "Paul Roche Belmont House"
+          "laborType": "Démolition & Dépose"
         },
         {
           "product": "beegcat",
-          "reference": null,
+          "reference": "4444444",
           "supplierLink": null,
-          "laborType": null,
           "price": {
             "ttc": null,
             "htQuote": null
@@ -169,7 +168,7 @@
             "client": {
               "status": "pending",
               "note": null,
-              "validatedAt": "2025-11-19T19:26:10.944Z",
+              "validatedAt": "2025-11-19T19:26:10.944000Z",
               "replacementUrls": [
                 "asdfuibasdifb",
                 "beeeeegcaturl",
@@ -177,10 +176,7 @@
                 "yanahimsayin"
               ]
             },
-            "cray": {
-              "status": null,
-              "note": null
-            }
+            "cray": {}
           },
           "order": {
             "ordered": false,
@@ -192,16 +188,14 @@
             "quantity": null
           },
           "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Paul Roche Belmont House"
+            "client": null,
+            "cray": null
+          }
         },
         {
           "product": "demo_item",
-          "reference": null,
+          "reference": "232323",
           "supplierLink": null,
-          "laborType": null,
           "price": {
             "ttc": null,
             "htQuote": null
@@ -210,15 +204,12 @@
             "client": {
               "status": "pending",
               "note": null,
-              "validatedAt": "2025-12-03T18:40:30.103Z",
+              "validatedAt": "2025-12-03T18:40:30.103000Z",
               "replacementUrls": [
                 "demo_item_new_url"
               ]
             },
-            "cray": {
-              "status": null,
-              "note": null
-            }
+            "cray": {}
           },
           "order": {
             "ordered": false,
@@ -230,16 +221,14 @@
             "quantity": null
           },
           "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Paul Roche Belmont House"
+            "client": null,
+            "cray": null
+          }
         },
         {
           "product": "sink",
-          "reference": null,
+          "reference": "sink_ref_2",
           "supplierLink": null,
-          "laborType": null,
           "price": {
             "ttc": null,
             "htQuote": null
@@ -248,15 +237,12 @@
             "client": {
               "status": "approved",
               "note": null,
-              "validatedAt": "2025-12-17T22:26:13.056Z",
+              "validatedAt": "2025-12-17T22:26:13.056000Z",
               "replacementUrls": [
                 "sink_url_alternative"
               ]
             },
-            "cray": {
-              "status": null,
-              "note": null
-            }
+            "cray": {}
           },
           "order": {
             "ordered": false,
@@ -268,42 +254,176 @@
             "quantity": null
           },
           "comments": {
-            "cray": null,
-            "client": null
+            "client": null,
+            "cray": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "sde-parentale",
+      "label": "Suite parentale",
+      "items": [
+        {
+          "product": "Meuble vasque Sklum Aldeia",
+          "reference": null,
+          "supplierLink": "https://www.sklum.com/fr/acheter-ensembles-de-meubles-de-salle-de-bain/169958-ensemble-de-meubles-de-salle-de-bain-en-bois-aldeia-avec-lavabo-integre.html?id_c=393153",
+          "price": {
+            "ttc": 529.94,
+            "htQuote": 481.76
           },
-          "chantier": "Alexis Roche Paris Apt"
+          "approvals": {
+            "client": {},
+            "cray": {
+              "status": "approved",
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "07/11",
+            "delivery": {
+              "date": null,
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "client": null,
+            "cray": null
+          }
         },
         {
-          "product": "",
-          "reference": null,
-          "supplierLink": null,
-          "laborType": null,
+          "product": "Hansgrohe corps d'encastrement (ref 13628000)",
+          "reference": "13628000",
+          "supplierLink": "https://www.reuter.com/fr-fr/hansgrohe-corps-dencastrement-pour-mitigeur-mural-encastre-lavabo-evier-a213772.php",
           "price": {
-            "ttc": null,
-            "htQuote": null
+            "ttc": 160.9,
+            "htQuote": 146.27
+          },
+          "approvals": {
+            "client": {},
+            "cray": {
+              "status": "approved",
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "23/10",
+            "delivery": {
+              "date": "29/10",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "client": null,
+            "cray": null
+          }
+        },
+        {
+          "product": "Mitigeur de lavabo Hansgrohe Tecturis S avec EcoSmart",
+          "reference": null,
+          "supplierLink": "#checked-checkbox-id",
+          "price": {
+            "ttc": 285.37,
+            "htQuote": 259.43
+          },
+          "approvals": {
+            "client": {},
+            "cray": {
+              "status": "pending",
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "28/11",
+            "delivery": {
+              "date": "28/02",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "client": null,
+            "cray": "3 à 5 semaines"
+          }
+        },
+        {
+          "product": "Armoire de toilette Geberit Option (70×15 cm, 2 portes)",
+          "reference": null,
+          "supplierLink": "https://www.reuter.com/fr-fr/villeroy-boch-embrace-armoire-de-toilette-avec-eclairage-l-120-h-785-p-167-cm-2-portes-montage-en-applique-aluminium-reflechissant-a1222624.php",
+          "price": {
+            "ttc": 516.83,
+            "htQuote": 469.85
+          },
+          "approvals": {
+            "client": {},
+            "cray": {
+              "status": "approved",
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
+            }
+          },
+          "order": {
+            "ordered": true,
+            "orderDate": "23/10",
+            "delivery": {
+              "date": "29/10",
+              "status": null
+            },
+            "quantity": 1
+          },
+          "comments": {
+            "client": null,
+            "cray": null
+          }
+        },
+        {
+          "product": "Hansgrohe iBox universel avec robinet d'arrêt (ref 01850180)",
+          "reference": "01850180",
+          "supplierLink": "https://www.reuter.com/fr-fr/hansgrohe-ibox-corps-encastre-universel-avec-robinet-darret-a377492.php",
+          "price": {
+            "ttc": 139.48,
+            "htQuote": 126.8
           },
           "approvals": {
             "client": {
-              "status": null,
-              "note": null
+              "status": "rejected",
+              "note": null,
+              "validatedAt": "2025-12-02T22:19:32.953000Z",
+              "replacementUrls": [
+                "tophat"
+              ]
             },
             "cray": {
-              "status": "rejected",
-              "note": null
+              "status": "approved",
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
             }
           },
           "order": {
-            "ordered": false,
-            "orderDate": null,
+            "ordered": true,
+            "orderDate": "23/10",
             "delivery": {
-              "date": null,
+              "date": "29/10",
               "status": null
             },
-            "quantity": null
+            "quantity": 1
           },
           "comments": {
-            "cray": null,
-            "client": null
+            "client": null,
+            "cray": null
           }
         }
       ]
@@ -323,11 +443,15 @@
           "approvals": {
             "client": {
               "status": "supplied_by",
-              "note": "fournisseur partenaire"
+              "note": "fournisseur partenaire",
+              "validatedAt": null,
+              "replacementUrls": []
             },
             "cray": {
               "status": "supplied_by",
-              "note": "fournisseur partenaire"
+              "note": "fournisseur partenaire",
+              "validatedAt": null,
+              "replacementUrls": []
             }
           },
           "order": {
@@ -340,10 +464,9 @@
             "quantity": null
           },
           "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Alexis Roche Paris Apt"
+            "client": null,
+            "cray": null
+          }
         },
         {
           "product": "Mitigeur Grohe (lave-mains)",
@@ -357,13 +480,16 @@
             "client": {
               "status": "approved",
               "note": null,
+              "validatedAt": null,
               "replacementUrls": [
                 "hellocat123"
               ]
             },
             "cray": {
               "status": "approved",
-              "note": null
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
             }
           },
           "order": {
@@ -376,10 +502,9 @@
             "quantity": 1
           },
           "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Alexis Roche Paris Apt"
+            "client": null,
+            "cray": null
+          }
         },
         {
           "product": "Plaque de déclenchement Geberit Omega 20 (chrome/blanc mat)",
@@ -392,11 +517,15 @@
           "approvals": {
             "client": {
               "status": "approved",
-              "note": null
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
             },
             "cray": {
               "status": "approved",
-              "note": null
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
             }
           },
           "order": {
@@ -409,10 +538,9 @@
             "quantity": 1
           },
           "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Paul Roche Belmont House"
+            "client": null,
+            "cray": null
+          }
         },
         {
           "product": "WC suspendu compact Geberit iCon + abattant",
@@ -423,13 +551,12 @@
             "htQuote": 363.15
           },
           "approvals": {
-            "client": {
-              "status": "change_order",
-              "note": "ok avenant"
-            },
+            "client": {},
             "cray": {
               "status": "approved",
-              "note": null
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
             }
           },
           "order": {
@@ -442,10 +569,9 @@
             "quantity": 1
           },
           "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Paul Roche Belmont House"
+            "client": null,
+            "cray": null
+          }
         },
         {
           "product": "Papier peint Sandberg Pine Grey",
@@ -456,13 +582,12 @@
             "htQuote": null
           },
           "approvals": {
-            "client": {
-              "status": "change_order",
-              "note": "ok avenant"
-            },
+            "client": {},
             "cray": {
               "status": "approved",
-              "note": null
+              "note": null,
+              "validatedAt": null,
+              "replacementUrls": []
             }
           },
           "order": {
@@ -470,190 +595,14 @@
             "orderDate": "10/01",
             "delivery": {
               "date": null,
-              "status": "livré"
+              "status": null
             },
             "quantity": null
           },
           "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Paul Roche Belmont House"
-        }
-      ]
-    },
-    {
-      "id": "sde-parentale",
-      "label": "Suite parentale",
-      "items": [
-        {
-          "product": "Meuble vasque Sklum Aldeia",
-          "reference": null,
-          "supplierLink": "https://www.sklum.com/fr/acheter-ensembles-de-meubles-de-salle-de-bain/169958-ensemble-de-meubles-de-salle-de-bain-en-bois-aldeia-avec-lavabo-integre.html?id_c=393153",
-          "price": {
-            "ttc": 529.94,
-            "htQuote": 481.76
-          },
-          "approvals": {
-            "client": {
-              "status": "change_order",
-              "note": "avenant ok"
-            },
-            "cray": {
-              "status": "approved",
-              "note": null
-            }
-          },
-          "order": {
-            "ordered": true,
-            "orderDate": "07/11",
-            "delivery": {
-              "date": null,
-              "status": "livré"
-            },
-            "quantity": 1
-          },
-          "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Alexis Roche Paris Apt"
-        },
-        {
-          "product": "Hansgrohe corps d'encastrement (ref 13628000)",
-          "reference": "13628000",
-          "supplierLink": "https://www.reuter.com/fr-fr/hansgrohe-corps-dencastrement-pour-mitigeur-mural-encastre-lavabo-evier-a213772.php",
-          "price": {
-            "ttc": 160.9,
-            "htQuote": 146.27
-          },
-          "approvals": {
-            "client": {
-              "status": "change_order",
-              "note": "avenant ok"
-            },
-            "cray": {
-              "status": "approved",
-              "note": null
-            }
-          },
-          "order": {
-            "ordered": true,
-            "orderDate": "23/10",
-            "delivery": {
-              "date": "29/10",
-              "status": null
-            },
-            "quantity": 1
-          },
-          "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Alexis Roche Paris Apt"
-        },
-        {
-          "product": "Mitigeur de lavabo Hansgrohe Tecturis S avec EcoSmart",
-          "reference": null,
-          "supplierLink": "#checked-checkbox-id",
-          "price": {
-            "ttc": 285.37,
-            "htQuote": 259.43
-          },
-          "approvals": {
-            "client": {
-              "status": "change_order",
-              "note": "avenant ok"
-            },
-            "cray": {
-              "status": "pending",
-              "note": null
-            }
-          },
-          "order": {
-            "ordered": true,
-            "orderDate": "28/11",
-            "delivery": {
-              "date": "28/02",
-              "status": null
-            },
-            "quantity": 1
-          },
-          "comments": {
-            "cray": "3 à 5 semaines",
-            "client": null
-          },
-          "chantier": "Alexis Roche Paris Apt"
-        },
-        {
-          "product": "Armoire de toilette Geberit Option (70×15 cm, 2 portes)",
-          "reference": null,
-          "supplierLink": "https://www.reuter.com/fr-fr/villeroy-boch-embrace-armoire-de-toilette-avec-eclairage-l-120-h-785-p-167-cm-2-portes-montage-en-applique-aluminium-reflechissant-a1222624.php",
-          "price": {
-            "ttc": 516.83,
-            "htQuote": 469.85
-          },
-          "approvals": {
-            "client": {
-              "status": "change_order",
-              "note": "avenant ok"
-            },
-            "cray": {
-              "status": "approved",
-              "note": null
-            }
-          },
-          "order": {
-            "ordered": true,
-            "orderDate": "23/10",
-            "delivery": {
-              "date": "29/10",
-              "status": null
-            },
-            "quantity": 1
-          },
-          "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Alexis Roche Paris Apt"
-        },
-        {
-          "product": "Hansgrohe iBox universel avec robinet d'arrêt (ref 01850180)",
-          "reference": "01850180",
-          "supplierLink": "https://www.reuter.com/fr-fr/hansgrohe-ibox-corps-encastre-universel-avec-robinet-darret-a377492.php",
-          "price": {
-            "ttc": 139.48,
-            "htQuote": 126.8
-          },
-          "approvals": {
-            "client": {
-              "status": "rejected",
-              "note": null,
-              "validatedAt": "2025-12-02T22:19:32.953Z",
-              "replacementUrls": [
-                "tophat"
-              ]
-            },
-            "cray": {
-              "status": "approved",
-              "note": null
-            }
-          },
-          "order": {
-            "ordered": true,
-            "orderDate": "23/10",
-            "delivery": {
-              "date": "29/10",
-              "status": null
-            },
-            "quantity": 1
-          },
-          "comments": {
-            "cray": null,
-            "client": null
-          },
-          "chantier": "Paul Roche NY Apt"
+            "client": null,
+            "cray": null
+          }
         }
       ]
     }

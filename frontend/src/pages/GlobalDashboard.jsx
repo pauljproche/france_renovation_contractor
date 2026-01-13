@@ -7,7 +7,7 @@ import { formatCurrency } from '../hooks/useMaterialsData.js';
 
 function GlobalDashboard() {
   const { t } = useTranslation();
-  const { projects, selectProject, hiddenFromRegularDemos } = useProjects();
+  const { projects, selectProject, hiddenFromRegularDemos, createProject } = useProjects();
   const navigate = useNavigate();
   const [legendExpanded, setLegendExpanded] = useState(false);
   const [demoExpanded, setDemoExpanded] = useState(false);

@@ -9,6 +9,8 @@ requests>=2.31.0
 sqlalchemy==2.0.23
 psycopg2-binary==2.9.9
 alembic==1.12.1
+passlib[bcrypt]==1.7.4
+bcrypt<5.0.0
 
 
 

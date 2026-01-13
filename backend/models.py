@@ -72,6 +72,7 @@ class DeliveryStatusEnum(str, enum.Enum):
 
 class UserRoleEnum(str, enum.Enum):
     """User role enum: Roles for users."""
+    ADMIN = 'admin'
     CONTRACTOR = 'contractor'
     CLIENT = 'client'
     WORKER = 'worker'
@@ -97,7 +98,8 @@ class User(Base):
     id = Column(String(50), primary_key=True)
     email = Column(String(255), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=True)  # Nullable if using OAuth only
-    role = Column(ENUM(UserRoleEnum, name='user_role_enum'), nullable=False)
+    password_plaintext = Column(String(255), nullable=True)  # TEMPORARY: For admin display/testing only - REMOVE IN PRODUCTION
+    role = Column(ENUM(UserRoleEnum, name='user_role_enum', values_callable=lambda x: [e.value for e in x]), nullable=False)
     zulip_user_id = Column(String(255), nullable=True)  # For Zulip bot integration
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

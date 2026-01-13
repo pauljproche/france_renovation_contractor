@@ -6,7 +6,7 @@ Handles CRUD operations for projects and project members.
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 try:
     from models import Project, ProjectMember, Quote, User, ProjectStatusEnum, QuoteStatusEnum, ProjectMemberRoleEnum, UserRoleEnum
@@ -203,14 +203,49 @@ def json_to_project(project_data: Dict[str, Any], session: Session, owner_user: 
     return project
 
 
-def get_all_projects(session: Session) -> List[Dict[str, Any]]:
+def get_all_projects(session: Session, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Get all projects from database (excluding demos) and convert to JSON format.
+    
+    If user_id is provided, only returns projects where:
+    - User is the owner (owner_id == user_id), OR
+    - User is a member (ProjectMember with user_id)
+    
+    If user_id is None, returns all projects (for admin/backward compatibility).
+    
+    Args:
+        session: Database session
+        user_id: Optional user ID to filter projects by membership
     
     Returns:
         list: List of project dictionaries (compatible with localStorage format)
     """
-    projects = session.query(Project).filter(Project.is_demo == False).order_by(Project.created_at).all()
+    query = session.query(Project).filter(Project.is_demo == False)
+    
+    # Filter by user membership if user_id provided
+    if user_id:
+        # Get projects where user is owner OR member
+        # Get project IDs where user is a member
+        member_project_ids = [
+            pm.project_id 
+            for pm in session.query(ProjectMember.project_id)
+            .filter(ProjectMember.user_id == user_id)
+            .all()
+        ]
+        
+        # Filter: owner OR member
+        if member_project_ids:
+            query = query.filter(
+                or_(
+                    Project.owner_id == user_id,
+                    Project.id.in_(member_project_ids)
+                )
+            )
+        else:
+            # No memberships, only show owned projects
+            query = query.filter(Project.owner_id == user_id)
+    
+    projects = query.order_by(Project.created_at.desc()).all()
     
     result = []
     for project in projects:
@@ -233,7 +268,7 @@ def get_project(session: Session, project_id: str) -> Optional[Dict[str, Any]]:
     return project_to_json(project, session)
 
 
-def create_project(session: Session, project_data: Dict[str, Any]) -> Dict[str, Any]:
+def create_project(session: Session, project_data: Dict[str, Any], owner_user: Optional[User] = None) -> Dict[str, Any]:
     """
     Create a new project.
     
@@ -248,7 +283,7 @@ def create_project(session: Session, project_data: Dict[str, Any]) -> Dict[str, 
     if "id" not in project_data:
         project_data["id"] = f"project-{datetime.utcnow().timestamp() * 1000:.0f}"
     
-    project = json_to_project(project_data, session)
+    project = json_to_project(project_data, session, owner_user=owner_user)
     session.flush()
     
     return project_to_json(project, session)

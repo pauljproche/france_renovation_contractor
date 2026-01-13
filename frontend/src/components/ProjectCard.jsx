@@ -3,26 +3,45 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useProjects } from '../contexts/ProjectsContext.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
+import CreateProjectModal from './CreateProjectModal.jsx';
 
 function ProjectCard({ project, isNewProject = false, onClick }) {
   const { t } = useTranslation();
   const { convertDemoToReal, removeOrDeleteProject, hiddenFromRegularDemos } = useProjects();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   if (isNewProject) {
     return (
-      <Link to="/global-dashboard" className="project-card project-card-new">
-        <div className="project-card-content">
-          <div className="project-card-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
+      <>
+        <button
+          type="button"
+          onClick={() => setShowCreateModal(true)}
+          className="project-card project-card-new"
+          style={{
+            border: 'none',
+            background: 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+            padding: 0
+          }}
+        >
+          <div className="project-card-content">
+            <div className="project-card-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </div>
+            <h3 className="project-card-title">{t('createNewProject')}</h3>
+            <p className="project-card-subtitle">{t('createNewProjectDesc')}</p>
           </div>
-          <h3 className="project-card-title">{t('createNewProject')}</h3>
-          <p className="project-card-subtitle">{t('createNewProjectDesc')}</p>
-        </div>
-      </Link>
+        </button>
+        <CreateProjectModal 
+          isOpen={showCreateModal} 
+          onClose={() => setShowCreateModal(false)} 
+        />
+      </>
     );
   }
 

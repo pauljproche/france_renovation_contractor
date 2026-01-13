@@ -14,11 +14,12 @@ function Sidebar() {
 
   const isGlobalDashboard = location.pathname === '/global-dashboard';
   const isSettings = location.pathname === '/settings';
+  const isAdmin = location.pathname === '/admin';
   const isTimeline = location.pathname === '/timeline';
   const isWorkers = location.pathname === '/workers';
 
-  // If on global dashboard, settings, timeline, or workers page, show navigation links
-  if (isGlobalDashboard || isSettings || isTimeline || isWorkers) {
+  // If on global dashboard, settings, admin, timeline, or workers page, show navigation links
+  if (isGlobalDashboard || isSettings || isAdmin || isTimeline || isWorkers) {
     return (
       <aside className="sidebar">
         <nav className="nav-links">
@@ -46,6 +47,15 @@ function Sidebar() {
           >
             {t('navSettings')}
           </NavLink>
+          {/* Admin link - only show if user has admin role */}
+          {role === 'admin' && (
+            <NavLink
+              to="/admin"
+              className={navLinkClass}
+            >
+              Admin
+            </NavLink>
+          )}
         </nav>
       </aside>
     );
@@ -75,7 +85,12 @@ function Sidebar() {
   ];
 
   // Filter items based on role, including custom roles
+  // Admin users can see all navigation items
   const visibleItems = navItems.filter(item => {
+    // Admin can access everything
+    if (role === 'admin') {
+      return true;
+    }
     if (item.roles.includes(role)) {
       return true;
     }
@@ -107,9 +122,10 @@ function Layout() {
   const location = useLocation();
   const isGlobalDashboard = location.pathname === '/global-dashboard';
   const isSettings = location.pathname === '/settings';
+  const isAdmin = location.pathname === '/admin';
   const isTimeline = location.pathname === '/timeline';
   const isWorkers = location.pathname === '/workers';
-  const showAIPanel = !isGlobalDashboard && !isSettings && !isTimeline && !isWorkers;
+  const showAIPanel = !isGlobalDashboard && !isSettings && !isAdmin && !isTimeline && !isWorkers;
   const { theme } = useTheme();
 
   return (
