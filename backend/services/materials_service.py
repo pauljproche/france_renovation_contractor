@@ -5,7 +5,7 @@ Converts between JSON format (used by frontend) and normalized database format.
 Handles sections, items, approvals, orders, comments, and replacement URLs.
 """
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
@@ -163,7 +163,7 @@ def item_to_json(item: Item, section: Section) -> Dict[str, Any]:
         approval_dict = {
             "status": map_approval_status_from_enum(approval.status),
             "note": approval.note,
-            "validatedAt": approval.validated_at.isoformat() + "Z" if approval.validated_at else None,
+            "validatedAt": approval.validated_at.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z') if approval.validated_at else None,
             "replacementUrls": []
         }
         

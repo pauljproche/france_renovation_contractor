@@ -638,10 +638,12 @@ BEGIN
             UPDATE items SET price_ht_quote = (p_new_value)::numeric, updated_at = NOW() WHERE id = p_item_id;
         WHEN 'product' THEN
             SELECT to_jsonb(product) INTO v_old_value FROM items WHERE id = p_item_id;
-            UPDATE items SET product = (p_new_value)::text, updated_at = NOW() WHERE id = p_item_id;
+            -- Extract text value from JSONB without quotes
+            UPDATE items SET product = (p_new_value#>>'{}'), updated_at = NOW() WHERE id = p_item_id;
         WHEN 'reference' THEN
             SELECT to_jsonb(reference) INTO v_old_value FROM items WHERE id = p_item_id;
-            UPDATE items SET reference = (p_new_value)::text, updated_at = NOW() WHERE id = p_item_id;
+            -- Extract text value from JSONB without quotes: use ->> operator or #>>'{}'
+            UPDATE items SET reference = (p_new_value#>>'{}'), updated_at = NOW() WHERE id = p_item_id;
         ELSE
             RAISE EXCEPTION 'Field % is not updatable', p_field_name;
     END CASE;

@@ -1291,7 +1291,13 @@ async def query_assistant(query: MaterialsQuery):
                                 "status": "success",
                                 "results": results,
                                 "count": len(results),
-                                "instruction": "If this search was for a validation action, you MUST now call preview_update_item_approval with the item_id from the first result."
+                                "instruction": (
+                                    "After searching, you MUST call the appropriate preview function:\n"
+                                    "- For validation/approval actions: call preview_update_item_approval with the item_id\n"
+                                    "- For field updates (price, product, reference): call preview_update_item_field with item_id, field_name, and new_value\n"
+                                    "- For replacement URL actions: call preview_add_replacement_url or preview_remove_replacement_url\n"
+                                    "Use the item_id from the first search result."
+                                )
                             })
                         except Exception as e:
                             logger.error(f"Error in search_items: {e}")
@@ -1679,14 +1685,6 @@ async def query_assistant(query: MaterialsQuery):
                     "content": tool_response_content
                 })
 
-            final_response = client.chat.completions.create(
-                model=default_model,
-                messages=messages,
-                temperature=0.2
-            )
-            final_message = final_response.choices[0].message
-            answer = final_message.content
-            
             # Phase 5: Check if any tool responses contain preview (requires confirmation)
             preview_response = None
             for msg in messages:
@@ -1701,12 +1699,6 @@ async def query_assistant(query: MaterialsQuery):
                             }
                             logger.info(f"🔍 Preview response detected: action_id={tool_result.get('action_id')}, action={tool_result.get('preview', {}).get('action')}")
                             break  # Use first preview found
-                        # Check for suspicious activity
-                        elif tool_result.get("suspicious"):
-                            # Add warning to answer if not already present
-                            if answer and "⚠️" not in answer and "WARNING" not in answer.upper():
-                                warning = "\n\n⚠️ WARNING: The update completed, but there may be an issue. Please verify the result."
-                                answer = answer + warning if answer else warning
                     except:
                         pass
             
@@ -1737,6 +1729,155 @@ async def query_assistant(query: MaterialsQuery):
                         "fr": "J'ai préparé une action. Veuillez examiner l'aperçu et confirmer pour exécuter."
                     }
                 }
+            
+            # If no preview, check if agent should make another tool call
+            # This happens when search_items returns results with an instruction to call preview functions
+            if not preview_response:
+                # Check if any tool response indicates another tool call is needed
+                needs_another_tool_call = False
+                for msg in messages:
+                    if msg.get("role") == "tool":
+                        try:
+                            tool_result = json.loads(msg.get("content", "{}"))
+                            # If search_items returned results with an instruction, agent should make another call
+                            if tool_result.get("status") == "success" and tool_result.get("instruction"):
+                                needs_another_tool_call = True
+                                logger.info(f"🔍 Tool response indicates another tool call needed: {tool_result.get('instruction')[:100]}")
+                                break
+                        except:
+                            pass
+                
+                if needs_another_tool_call:
+                    # Make another API call WITH tools enabled so agent can make the second tool call
+                    logger.info("🔍 Making follow-up API call with tools enabled for chained tool calls")
+                    follow_up_response = client.chat.completions.create(
+                        model=default_model,
+                        messages=messages,
+                        tools=tools,
+                        tool_choice="auto",
+                        temperature=0.2
+                    )
+                    follow_up_message = follow_up_response.choices[0].message
+                    
+                    # If agent made another tool call, execute it
+                    if follow_up_message.tool_calls:
+                        logger.info(f"🔍 Agent made {len(follow_up_message.tool_calls)} follow-up tool call(s)")
+                        messages.append({
+                            "role": "assistant",
+                            "content": follow_up_message.content or "",
+                            "tool_calls": [tc.dict() for tc in follow_up_message.tool_calls]
+                        })
+                        
+                        for tool_call in follow_up_message.tool_calls:
+                            function_name = tool_call.function.name
+                            
+                            # Handle the follow-up tool call (same logic as above)
+                            if USE_DATABASE and agent_tools:
+                                if function_name == "preview_update_item_approval":
+                                    try:
+                                        arguments = json.loads(tool_call.function.arguments)
+                                        item_id = arguments.get("item_id")
+                                        role = arguments.get("role")
+                                        status = arguments.get("status")
+                                        user_role = arguments.get("user_role")
+                                        logger.info(f"🔍 Follow-up preview function: preview_update_item_approval(item_id={item_id})")
+                                        result = agent_tools.preview_update_item_approval(item_id, role, status, user_role)
+                                        tool_response_content = json.dumps(result)
+                                        logger.info(f"🔍 Preview generated: action_id={result.get('action_id')}")
+                                    except Exception as e:
+                                        logger.error(f"Error in follow-up preview_update_item_approval: {e}")
+                                        tool_response_content = json.dumps({"error": str(e)})
+                                
+                                elif function_name == "preview_update_item_field":
+                                    try:
+                                        arguments = json.loads(tool_call.function.arguments)
+                                        item_id = arguments.get("item_id")
+                                        field_name = arguments.get("field_name")
+                                        new_value = arguments.get("new_value")
+                                        expected_product_hint = arguments.get("expected_product_hint")
+                                        logger.info(f"🔍 Follow-up preview function: preview_update_item_field(item_id={item_id}, field={field_name})")
+                                        result = agent_tools.preview_update_item_field(item_id, field_name, new_value, expected_product_hint)
+                                        tool_response_content = json.dumps(result)
+                                        logger.info(f"🔍 Preview generated: action_id={result.get('action_id')}")
+                                    except Exception as e:
+                                        logger.error(f"Error in follow-up preview_update_item_field: {e}")
+                                        tool_response_content = json.dumps({"error": str(e)})
+                                
+                                elif function_name == "preview_add_replacement_url":
+                                    try:
+                                        arguments = json.loads(tool_call.function.arguments)
+                                        item_id = arguments.get("item_id")
+                                        role = arguments.get("role")
+                                        url = arguments.get("url")
+                                        result = agent_tools.preview_add_replacement_url(item_id, role, url)
+                                        tool_response_content = json.dumps(result)
+                                    except Exception as e:
+                                        logger.error(f"Error in follow-up preview_add_replacement_url: {e}")
+                                        tool_response_content = json.dumps({"error": str(e)})
+                                
+                                elif function_name == "preview_remove_replacement_url":
+                                    try:
+                                        arguments = json.loads(tool_call.function.arguments)
+                                        item_id = arguments.get("item_id")
+                                        role = arguments.get("role")
+                                        url = arguments.get("url")
+                                        result = agent_tools.preview_remove_replacement_url(item_id, role, url)
+                                        tool_response_content = json.dumps(result)
+                                    except Exception as e:
+                                        logger.error(f"Error in follow-up preview_remove_replacement_url: {e}")
+                                        tool_response_content = json.dumps({"error": str(e)})
+                                else:
+                                    tool_response_content = json.dumps({"error": f"Unknown follow-up tool {function_name}"})
+                            else:
+                                tool_response_content = json.dumps({"error": "Database tools not available"})
+                            
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": tool_response_content
+                            })
+                            
+                            # Check if this follow-up tool response contains a preview
+                            try:
+                                tool_result = json.loads(tool_response_content)
+                                if tool_result.get("status") == "requires_confirmation":
+                                    preview_response = {
+                                        "preview": tool_result.get("preview"),
+                                        "action_id": tool_result.get("action_id")
+                                    }
+                                    logger.info(f"🔍 Preview from follow-up tool call: action_id={tool_result.get('action_id')}")
+                                    break
+                            except:
+                                pass
+                        
+                        # If preview found from follow-up, return it
+                        if preview_response:
+                            return {
+                                "preview": preview_response["preview"],
+                                "action_id": preview_response["action_id"],
+                                "message": {
+                                    "en": "I've prepared an action. Please review the preview and confirm to execute.",
+                                    "fr": "J'ai préparé une action. Veuillez examiner l'aperçu et confirmer pour exécuter."
+                                }
+                            }
+                    
+                    # Get final response after follow-up tool calls
+                    final_response = client.chat.completions.create(
+                        model=default_model,
+                        messages=messages,
+                        temperature=0.2
+                    )
+                    final_message = final_response.choices[0].message
+                    answer = final_message.content
+                else:
+                    # No follow-up needed, get final response
+                    final_response = client.chat.completions.create(
+                        model=default_model,
+                        messages=messages,
+                        temperature=0.2
+                    )
+                    final_message = final_response.choices[0].message
+                    answer = final_message.content
         else:
             answer = response_message.content
 

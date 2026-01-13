@@ -14,7 +14,7 @@ import os
 import secrets
 import json
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
@@ -91,6 +91,40 @@ def _get_stored_action(action_id: str) -> Optional[Dict[str, Any]]:
         return None
     
     return action
+
+
+def get_most_recent_unexecuted_action() -> Optional[Tuple[str, Dict[str, Any]]]:
+    """
+    Get the most recent unexecuted action preview.
+    Returns (action_id, action_data) or None.
+    Useful when user confirms via text instead of modal.
+    """
+    now = datetime.now()
+    sql_logger.info(f"🔍 Checking action store: {len(_action_store)} total actions")
+    
+    recent_actions = [
+        (action_id, action)
+        for action_id, action in _action_store.items()
+        if not action.get("executed", False) and now <= action["expires_at"]
+    ]
+    
+    sql_logger.info(f"🔍 Found {len(recent_actions)} unexecuted, non-expired actions")
+    
+    if not recent_actions:
+        # Log all actions for debugging
+        for action_id, action in _action_store.items():
+            age = (now - action["created_at"]).total_seconds()
+            expired = now > action["expires_at"]
+            executed = action.get("executed", False)
+            sql_logger.info(f"   Action {action_id[:20]}...: age={age:.1f}s, expired={expired}, executed={executed}")
+        return None
+    
+    # Sort by creation time (most recent first)
+    recent_actions.sort(key=lambda x: x[1]["created_at"], reverse=True)
+    most_recent = recent_actions[0]
+    age = (now - most_recent[1]["created_at"]).total_seconds()
+    sql_logger.info(f"✅ Most recent action: {most_recent[0][:20]}... (age: {age:.1f}s)")
+    return most_recent
 
 
 def _mark_action_executed(action_id: str, result: Any = None):
@@ -411,12 +445,14 @@ def preview_update_item_field(
     if not isinstance(field_name, str) or not field_name.strip():
         raise ValueError("Invalid field_name")
     
-    # Convert new_value to JSONB
+    # Convert new_value to JSONB string
     new_value_jsonb = json.dumps(new_value) if not isinstance(new_value, str) or new_value[0] != '{' else new_value
     
     with agent_engine.connect() as conn:
+        # Use bindparam to properly handle the JSONB cast
+        from sqlalchemy import bindparam
         result = conn.execute(
-            text("SELECT update_item_field_preview(:item_id, :field_name, :new_value::jsonb, :expected_product_hint)"),
+            text("SELECT update_item_field_preview(:item_id, :field_name, CAST(:new_value AS jsonb), :expected_product_hint)"),
             {
                 "item_id": item_id,
                 "field_name": field_name.strip(),
@@ -432,6 +468,9 @@ def preview_update_item_field(
         sql_query = preview_data["sql"]["query"]
         sql_params = preview_data["sql"]["params"]
         action_id = _store_action_preview(preview_data, sql_query, sql_params)
+        
+        sql_logger.info(f"✅ Preview stored: action_id={action_id}, action={preview_data.get('action')}, item_id={item_id}, field={field_name}")
+        sql_logger.info(f"   Action store now has {len(_action_store)} action(s)")
         
         return {
             "status": "requires_confirmation",
@@ -484,22 +523,48 @@ def execute_confirmed_action(action_id: str) -> Dict[str, Any]:
                 _log_sql_query("execute_update_item_approval", sql_query, params, 1 if success else 0)
                 
             elif action_type == "add_replacement_url":
+                # The preview function stores approval_id, but execution function needs item_id
+                # Get item_id from preview_data, role from field_path, url from sql_params
+                item_id = preview_data.get("item_id")
+                role = preview_data.get("field_path", "").split(".")[1] if "." in preview_data.get("field_path", "") else sql_params.get("role")
+                url = sql_params.get("url")
+                
+                if not item_id:
+                    raise ValueError("item_id not found in preview data")
+                if not role:
+                    raise ValueError("role not found in preview data or sql_params")
+                if not url:
+                    raise ValueError("url not found in sql_params")
+                
                 sql_query = "SELECT execute_add_replacement_url(:item_id, :role, :url)"
                 params = {
-                    "item_id": sql_params["item_id"],
-                    "role": sql_params["role"],
-                    "url": sql_params["url"]
+                    "item_id": item_id,
+                    "role": role,
+                    "url": url
                 }
                 result = conn.execute(text(sql_query), params)
                 success = result.scalar()
                 _log_sql_query("execute_add_replacement_url", sql_query, params, 1 if success else 0)
                 
             elif action_type == "remove_replacement_url":
+                # The preview function stores approval_id, but execution function needs item_id
+                # Get item_id from preview_data, role from field_path, url from sql_params
+                item_id = preview_data.get("item_id")
+                role = preview_data.get("field_path", "").split(".")[1] if "." in preview_data.get("field_path", "") else sql_params.get("role")
+                url = sql_params.get("url")
+                
+                if not item_id:
+                    raise ValueError("item_id not found in preview data")
+                if not role:
+                    raise ValueError("role not found in preview data or sql_params")
+                if not url:
+                    raise ValueError("url not found in sql_params")
+                
                 sql_query = "SELECT execute_remove_replacement_url(:item_id, :role, :url)"
                 params = {
-                    "item_id": sql_params["item_id"],
-                    "role": sql_params["role"],
-                    "url": sql_params["url"]
+                    "item_id": item_id,
+                    "role": role,
+                    "url": url
                 }
                 result = conn.execute(text(sql_query), params)
                 success = result.scalar()
@@ -507,11 +572,25 @@ def execute_confirmed_action(action_id: str) -> Dict[str, Any]:
                 
             elif action_type == "update_item_field":
                 # For generic field updates, execute SQL directly (but through function)
-                sql_query = "SELECT execute_update_item_field(:item_id, :field_name, :new_value::jsonb)"
+                # Use CAST instead of ::jsonb for SQLAlchemy compatibility
+                # sql_params["new_value"] is already the actual value from the preview SQL function
+                # The SQL function expects JSONB, so we need to convert the value to JSON
+                # For strings: json.dumps("sink_ref") -> "\"sink_ref\"" (JSON string)
+                # PostgreSQL JSONB will parse this and the SQL function extracts with ::text
+                # But ::text on a JSONB string gives the string WITH quotes, so we need to extract properly
+                new_value_param = sql_params["new_value"]
+                
+                # Convert to JSON string for JSONB
+                # The SQL function does (p_new_value)::text which extracts text from JSONB
+                # For a JSONB string "sink_ref", ::text gives "sink_ref" (the string value)
+                # So we need to pass it as a JSON string
+                new_value_json = json.dumps(new_value_param)
+                
+                sql_query = "SELECT execute_update_item_field(:item_id, :field_name, CAST(:new_value AS jsonb))"
                 params = {
                     "item_id": sql_params["item_id"],
                     "field_name": preview_data["field_path"],
-                    "new_value": json.dumps(sql_params["new_value"])
+                    "new_value": new_value_json
                 }
                 result = conn.execute(text(sql_query), params)
                 success = result.scalar()

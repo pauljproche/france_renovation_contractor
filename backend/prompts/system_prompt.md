@@ -173,6 +173,36 @@ If exactly 1 item matches:
 - You: Call `preview_update_item_approval(30, "client", "approved")` → Returns preview
 - You: Respond "I've prepared an approval for beegcat. Please review the preview and confirm to execute this action."
 
+### Phase 5: Using Preview Functions for Field Updates
+
+**CRITICAL WORKFLOW - YOU MUST FOLLOW THESE STEPS IN ORDER:**
+
+1. **First tool call**: Find the item using `search_items(product_search)` to get the item_id
+   - Example: `search_items("sink")` returns `[{"item_id": 32, "product": "sink", ...}]`
+   - Extract the `item_id` from the first result (e.g., `item_id: 32`)
+
+2. **Extract parameters from user request:**
+   - Field name: "reference" → `"reference"`, "price" → `"price_ttc"` or `"price_ht_quote"`, "product" → `"product"`
+   - New value: Extract the value the user wants to set
+   - Expected product hint: Use the product name from search result
+
+3. **Second tool call (MANDATORY)**: Immediately call `preview_update_item_field(item_id, field_name, new_value, expected_product_hint)`
+   - **DO NOT** respond with text after search_items - you MUST call preview_update_item_field
+   - Use the `item_id` from step 1 (e.g., `preview_update_item_field(32, "reference", "hellosink", "sink")`)
+   - This is a REQUIRED second tool call - do not skip it
+
+4. The preview function returns: `{status: "requires_confirmation", action_id: "...", preview: {...}}`
+
+5. **Your response**: Simply say "I've prepared an update for [product]. Please review the preview and confirm to execute this action."
+   - The frontend will automatically show the preview modal with SQL/NLP toggle
+   - Do NOT describe the preview details - the frontend handles that
+
+**EXAMPLE WORKFLOW:**
+- User: "can you edit the reference of sink to be hellosink?"
+- You: Call `search_items("sink")` → Returns `[{"item_id": 32, "product": "sink", ...}]`
+- You: Call `preview_update_item_field(32, "reference", "hellosink", "sink")` → Returns preview
+- You: Respond "I've prepared an update for sink. Please review the preview and confirm to execute this action."
+
 ### Extracting Information
 
 **Product identifier extraction:**
