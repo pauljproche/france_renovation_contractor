@@ -101,43 +101,35 @@ def load_materials_data() -> dict:
 
 def write_materials_data(data: dict) -> None:
     """
-    Write materials data to database and/or JSON file (dual-write).
+    Write materials data to database or JSON file based on USE_DATABASE flag.
     
-    Strategy: Write to DB first (source of truth), then JSON (backup).
-    If DB write fails, transaction rolls back and operation fails.
-    If JSON write fails but DB succeeded, log warning and continue.
+    Phase 6: Database-only writes when USE_DATABASE=true.
+    JSON writes only occur when USE_DATABASE=false (fallback mode).
     
     Args:
         data: Materials data dictionary in JSON format
     """
     use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
     
-    db_success = False
-    
-    # Write to DB first (source of truth)
     if use_database:
+        # Phase 6: Write to database only (no JSON writes)
         try:
             with db_session() as session:
                 materials_service.save_materials_dict(data, session)
                 session.commit()
-                db_success = True
                 logger.debug("Materials written to database successfully")
         except Exception as e:
             logger.error(f"DB write failed: {e}")
-            raise  # Fail fast - don't write to JSON if DB fails
-    
-    # Write to JSON (backup during migration)
-    try:
-        with open(MATERIALS_FILE_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        logger.debug("Materials written to JSON file successfully")
-    except Exception as e:
-        logger.error(f"JSON write failed: {e}")
-        if db_success:
-            # DB succeeded but JSON failed - log warning, continue
-            logger.warning("JSON backup write failed, but DB write succeeded")
-        else:
-            raise  # Both failed
+            raise
+    else:
+        # Fallback mode: Write to JSON only (when database is disabled)
+        try:
+            with open(MATERIALS_FILE_PATH, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            logger.debug("Materials written to JSON file successfully")
+        except Exception as e:
+            logger.error(f"JSON write failed: {e}")
+            raise
 
 
 def build_agent_tools() -> List[Dict[str, Any]]:
@@ -605,7 +597,8 @@ def update_cell(section_id: str, item_index: int, field_path: str, new_value: An
     """
     Update a single field in the materials table with validation.
     
-    Supports both database and JSON modes based on USE_DATABASE flag.
+    Phase 6: When USE_DATABASE=true, writes to database only (no JSON writes).
+    When USE_DATABASE=false, writes to JSON file (fallback mode).
     
     Args:
         section_id: Section identifier
@@ -685,12 +678,8 @@ def update_cell(section_id: str, item_index: int, field_path: str, new_value: An
                 # Reload data to return updated JSON format
                 data = materials_service.get_materials_dict(session)
                 
-                # Write to JSON for backup (skip DB write since we already updated)
-                try:
-                    with open(MATERIALS_FILE_PATH, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, indent=2, ensure_ascii=False)
-                except Exception as e:
-                    logger.warning(f"JSON backup write failed: {e}")
+                # Phase 6: No JSON write - database is the source of truth
+                # JSON is updated via daily cron job backup script
                 
                 # Find updated item in JSON format for return
                 sections = data.get('sections', [])
