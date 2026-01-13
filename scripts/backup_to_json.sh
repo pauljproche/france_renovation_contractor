@@ -37,28 +37,22 @@ if not use_db:
     exit 1
 fi
 
-# Activate virtual environment if it exists
-# Note: On AWS, venv is typically at backend/venv/bin/activate
-if [ -f "backend/venv/bin/activate" ]; then
-    source backend/venv/bin/activate
-elif [ -f "venv/bin/activate" ]; then
-    source venv/bin/activate
-else
-    # Try to find Python with required packages in system path
-    if ! python3 -c "import sqlalchemy" 2>/dev/null; then
-        echo "ERROR: Could not find virtual environment and sqlalchemy is not available"
-        exit 1
-    fi
+# Determine Python executable (prefer venv Python)
+PYTHON_CMD="python3"
+if [ -f "backend/venv/bin/python3" ]; then
+    PYTHON_CMD="backend/venv/bin/python3"
+elif [ -f "venv/bin/python3" ]; then
+    PYTHON_CMD="venv/bin/python3"
 fi
 
 # Verify Python can import required modules
-if ! python3 -c "import sqlalchemy" 2>/dev/null; then
-    log "ERROR: sqlalchemy not found. Make sure virtual environment is activated."
+if ! "$PYTHON_CMD" -c "import sqlalchemy" 2>/dev/null; then
+    log "ERROR: sqlalchemy not found. Make sure virtual environment is set up correctly."
     exit 1
 fi
 
 # Run export script
-if python3 backend/scripts/migrate_db_to_json.py --output-dir data/ 2>&1 | tee -a "$LOG_FILE"; then
+if "$PYTHON_CMD" backend/scripts/migrate_db_to_json.py --output-dir data/ 2>&1 | tee -a "$LOG_FILE"; then
     log "✅ JSON backup export completed successfully"
     exit 0
 else
