@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from sqlalchemy.orm import joinedload
 from backend.database import SessionLocal
 from backend.models import (
-    Project, Section, Item, Approval, ReplacementUrl, Order, Comment,
+    Project, Section, Item, Approval, ReplacementURL, Order, Comment,
     Worker, WorkerJob, EditHistory, Quote
 )
 
@@ -81,7 +81,7 @@ def export_materials(session, output_dir: Path):
                 }
                 
                 # Get replacement URLs
-                urls = session.query(ReplacementUrl).filter(ReplacementUrl.approval_id == approval.id).all()
+                urls = session.query(ReplacementURL).filter(ReplacementURL.approval_id == approval.id).all()
                 approval_dict["replacementUrls"] = [url.url for url in urls]
                 
                 item_dict["approvals"][role_key] = approval_dict

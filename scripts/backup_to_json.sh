@@ -38,10 +38,17 @@ if not use_db:
 fi
 
 # Activate virtual environment if it exists
+# Note: On AWS, venv is typically at backend/venv/bin/activate
 if [ -f "backend/venv/bin/activate" ]; then
     source backend/venv/bin/activate
 elif [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
+else
+    # Try to find Python with required packages in system path
+    if ! python3 -c "import sqlalchemy" 2>/dev/null; then
+        echo "ERROR: Could not find virtual environment and sqlalchemy is not available"
+        exit 1
+    fi
 fi
 
 # Verify Python can import required modules
