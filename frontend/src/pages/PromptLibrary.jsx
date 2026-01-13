@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useTranslation } from '../hooks/useTranslation.js';
 import { useLanguage } from '../contexts/AppContext.jsx';
 import { loadPrompts, savePrompts } from '../utils/promptLibraryStorage.js';
+import { generateUUID } from '../utils/uuid.js';
 
 function PromptLibrary() {
   const { t } = useTranslation();
@@ -35,7 +36,7 @@ function PromptLibrary() {
     
     // Auto-save the prompt
     const newPromptObj = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       prompt: trimmed,
       category: null,
       createdAt: new Date().toISOString(),
@@ -111,7 +112,7 @@ function PromptLibrary() {
     }
 
     const prompt = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       prompt: newPrompt.trim(),
       category: newCategory.trim() || null,
       createdAt: new Date().toISOString(),

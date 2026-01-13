@@ -175,3 +175,4 @@ psql -h localhost -U postgres -d france_renovation -c "\du agent_user"
 grep USE_DATABASE backend/.env 2>/dev/null || echo "Not set in .env"
 ```
 
+

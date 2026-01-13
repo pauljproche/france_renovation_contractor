@@ -2,6 +2,7 @@
  * Utility functions for managing AI Panel session storage
  * Handles localStorage and sessionStorage operations for chat sessions
  */
+import { generateUUID } from './uuid.js';
 
 // Storage key for AI panel chat sessions
 export const getAIPanelSessionsKey = () => {
@@ -65,7 +66,7 @@ export const setCurrentSessionId = (sessionId) => {
 
 // Create a new session
 export const createNewSession = () => {
-  const sessionId = crypto.randomUUID();
+  const sessionId = generateUUID();
   const now = new Date();
   return {
     id: sessionId,

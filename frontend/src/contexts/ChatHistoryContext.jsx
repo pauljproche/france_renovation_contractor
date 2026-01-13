@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { generateUUID } from '../utils/uuid.js';
 
 const ChatHistoryContext = createContext(undefined);
 
@@ -80,7 +81,7 @@ export function ChatHistoryProvider({ children }) {
     
     const newEntry = {
       ...entry,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       timestamp: new Date()
     };
     setHistory((prev) => {

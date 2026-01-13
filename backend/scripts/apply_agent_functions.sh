@@ -34,3 +34,4 @@ echo "2. Update AGENT_DATABASE_URL in .env file"
 echo "3. Test agent tools with preview + confirmation system"
 
 
+

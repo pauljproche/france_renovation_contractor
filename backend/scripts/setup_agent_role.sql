@@ -78,3 +78,4 @@ RAISE NOTICE 'Update password in production: ALTER ROLE agent_user WITH PASSWORD
 RAISE NOTICE 'Update AGENT_DATABASE_URL in .env: postgresql://agent_user:secure_password@localhost:5432/france_renovation';
 
 
+
