@@ -284,17 +284,24 @@ def json_to_item(item_data: Dict[str, Any], section: Section, session: Session) 
             delivery_status = map_delivery_status_to_enum(order_data["delivery"].get("status"))
         
         if existing_order:
-            existing_order.ordered = order_data.get("ordered", False)
-            existing_order.order_date = order_data.get("orderDate")
+            ordered = order_data.get("ordered", False)
+            existing_order.ordered = ordered
+            # Constraint: If ordered is False, order_date must be NULL
+            if ordered:
+                existing_order.order_date = order_data.get("orderDate")
+            else:
+                existing_order.order_date = None
             existing_order.delivery_date = order_data.get("delivery", {}).get("date")
             existing_order.delivery_status = delivery_status
             existing_order.quantity = order_data.get("quantity")
             existing_order.updated_at = datetime.utcnow()
         else:
+            ordered = order_data.get("ordered", False)
             order = Order(
                 item_id=item.id,
-                ordered=order_data.get("ordered", False),
-                order_date=order_data.get("orderDate"),
+                ordered=ordered,
+                # Constraint: If ordered is False, order_date must be NULL
+                order_date=order_data.get("orderDate") if ordered else None,
                 delivery_date=order_data.get("delivery", {}).get("date"),
                 delivery_status=delivery_status,
                 quantity=order_data.get("quantity"),
@@ -556,9 +563,16 @@ def update_item_field(
         
         if field == "ordered":
             order.ordered = bool(new_value)
+            # Constraint: If ordered is False, order_date must be NULL
+            if not bool(new_value):
+                order.order_date = None
             order.updated_at = datetime.utcnow()
         elif field == "orderDate":
-            order.order_date = new_value
+            # Constraint: If ordered is False, order_date must be NULL
+            if order.ordered:
+                order.order_date = new_value
+            else:
+                order.order_date = None
             order.updated_at = datetime.utcnow()
         elif field == "delivery":
             if isinstance(new_value, dict):

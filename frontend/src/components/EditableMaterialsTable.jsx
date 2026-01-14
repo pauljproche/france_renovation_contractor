@@ -12,6 +12,7 @@ import {
   EditableCell,
   HTQuoteCell,
   DateBubbleCell,
+  DateInputCell,
   ApprovalCellContent,
   ApprovalTag
 } from './tableCells/index.js';
@@ -1065,6 +1066,35 @@ export default function EditableMaterialsTable({ search }) {
     
     const item = section.items[itemIndex];
     
+    // Ensure order object exists
+    if (!item.order) {
+      item.order = { ordered: false, delivery: {} };
+    }
+    if (!item.order.delivery) {
+      item.order.delivery = {};
+    }
+    
+    // Database constraint: If orderDate is set, ordered must be true
+    // If orderDate is cleared, ordered should be false
+    if (field === 'order.orderDate') {
+      if (value && value.trim() !== '') {
+        // Date is being set, ensure ordered is true
+        item.order.ordered = true;
+      } else {
+        // Date is being cleared, set ordered to false
+        item.order.ordered = false;
+      }
+    }
+    
+    // Database constraint: If delivery.date is set, we might want to ensure ordered is true
+    // (This is optional, but makes sense - if there's a delivery date, it should be ordered)
+    if (field === 'order.delivery.date' && value && value.trim() !== '') {
+      if (!item.order.ordered && !item.order.orderDate) {
+        // If not ordered and no order date, set ordered to true when delivery date is set
+        item.order.ordered = true;
+      }
+    }
+    
     // Get old value before updating
     let oldValue;
     if (field.includes('.')) {
@@ -1875,7 +1905,7 @@ export default function EditableMaterialsTable({ search }) {
                         );
                       case 'orderDate':
                         return (
-                          <DateBubbleCell
+                          <DateInputCell
                             key={column}
                             value={item?.order?.orderDate}
                             field="order.orderDate"
@@ -1886,7 +1916,7 @@ export default function EditableMaterialsTable({ search }) {
                         );
                       case 'deliveryDate':
                         return (
-                          <DateBubbleCell
+                          <DateInputCell
                             key={column}
                             value={item?.order?.delivery?.date}
                             field="order.delivery.date"
@@ -2330,7 +2360,7 @@ export default function EditableMaterialsTable({ search }) {
                               );
                             case 'orderDate':
                               return (
-                                <DateBubbleCell
+                                <DateInputCell
                                   key={column}
                                   value={item?.order?.orderDate}
                                   field="order.orderDate"
@@ -2340,7 +2370,7 @@ export default function EditableMaterialsTable({ search }) {
                               );
                             case 'deliveryDate':
                               return (
-                                <DateBubbleCell
+                                <DateInputCell
                                   key={column}
                                   value={item?.order?.delivery?.date}
                                   field="order.delivery.date"
