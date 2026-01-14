@@ -1123,5 +1123,137 @@
     "old_value": false,
     "new_value": true,
     "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:50:52.787548Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:51:12.240225Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "price.htQuote",
+    "old_value": null,
+    "new_value": 2323,
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:51:19.048367Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "approved",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:51:25.272342Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "rejected",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:51:34.920545Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "change_order",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:51:40.649427Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": null,
+    "new_value": "approved",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:55:04.730043Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": "approved",
+    "new_value": "change_order",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:55:11.807447Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": null,
+    "new_value": "rejected",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:55:17.937656Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "approvals.client.status",
+    "old_value": "rejected",
+    "new_value": "supplied_by",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:55:51.307258Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "price.ttc",
+    "old_value": null,
+    "new_value": 1324,
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:56:05.201549Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "order.orderDate",
+    "old_value": null,
+    "new_value": "23/1",
+    "source": "manual"
+  },
+  {
+    "timestamp": "2026-01-14T21:56:14.502942Z",
+    "section_id": "kitchen",
+    "section_label": "Cuisine",
+    "item_index": 6,
+    "product": "sink",
+    "field_path": "order.orderDate",
+    "old_value": null,
+    "new_value": "12/2",
+    "source": "manual"
   }
 ]

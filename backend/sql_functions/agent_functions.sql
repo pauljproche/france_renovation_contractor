@@ -266,7 +266,13 @@ CREATE OR REPLACE FUNCTION execute_update_item_approval(
 ) RETURNS BOOLEAN AS $$
 DECLARE
     v_old_status VARCHAR;
+    v_status_enum approval_status_enum;
 BEGIN
+    -- Convert lowercase status to uppercase enum value
+    -- The database enum uses uppercase (APPROVED, REJECTED, etc.)
+    -- but the API sends lowercase (approved, rejected, etc.)
+    v_status_enum := UPPER(p_status)::approval_status_enum;
+    
     -- Get old status for edit history
     SELECT status INTO v_old_status
     FROM approvals
@@ -274,9 +280,9 @@ BEGIN
     
     -- Perform update (atomic)
     INSERT INTO approvals (item_id, role, status, updated_at)
-    VALUES (p_item_id, p_role, p_status, NOW())
+    VALUES (p_item_id, p_role, v_status_enum, NOW())
     ON CONFLICT (item_id, role) 
-    DO UPDATE SET status = p_status, updated_at = NOW();
+    DO UPDATE SET status = v_status_enum, updated_at = NOW();
     
     -- Log edit history
     INSERT INTO edit_history (item_id, field_path, old_value, new_value, source)
@@ -291,7 +297,7 @@ BEGIN
     RETURN TRUE;
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE EXCEPTION 'Failed to update approval';
+        RAISE EXCEPTION 'Failed to update approval: %', SQLERRM;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
