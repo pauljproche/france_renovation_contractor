@@ -5,6 +5,8 @@ import { useProjects } from '../contexts/ProjectsContext.jsx';
 import ProjectCard from '../components/ProjectCard.jsx';
 import { formatCurrency } from '../hooks/useMaterialsData.js';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 function GlobalDashboard() {
   const { t } = useTranslation();
   const { projects, selectProject, hiddenFromRegularDemos, createProject } = useProjects();
@@ -12,6 +14,8 @@ function GlobalDashboard() {
   const [legendExpanded, setLegendExpanded] = useState(false);
   const [demoExpanded, setDemoExpanded] = useState(false);
   const [previousDemoCount, setPreviousDemoCount] = useState(0);
+  const [materialsData, setMaterialsData] = useState(null);
+  const [showHiddenProjects, setShowHiddenProjects] = useState(false);
 
   const handleProjectClick = (projectId) => {
     selectProject(projectId);
@@ -25,7 +29,21 @@ function GlobalDashboard() {
   // Unless a demo has been hidden from regular projects
   const { demoProjects, regularProjects } = useMemo(() => {
     const mainDemoId = 'demo-project';
+    
+    // Debug: log projects and their hidden status
+    console.log('Filtering projects:', {
+      showHiddenProjects,
+      totalProjects: projects.length,
+      projectsWithHidden: projects.filter(p => p.hidden).map(p => ({ id: p.id, name: p.name, hidden: p.hidden }))
+    });
+    
     const demos = projects.filter(p => {
+      // Exclude hidden projects unless showHiddenProjects is true
+      // Explicitly check for true (not just truthy)
+      if (p.hidden === true && !showHiddenProjects) {
+        return false;
+      }
+      
       if (!p.isDemo) return false;
       // If main demo is hidden from regular, include it in demos
       if (p.id === mainDemoId && hiddenFromRegularDemos.includes(mainDemoId)) {
@@ -35,6 +53,12 @@ function GlobalDashboard() {
       return p.id !== mainDemoId;
     });
     const regular = projects.filter(p => {
+      // Exclude hidden projects unless showHiddenProjects is true
+      // Explicitly check for true (not just truthy)
+      if (p.hidden === true && !showHiddenProjects) {
+        return false;
+      }
+      
       if (!p.isDemo) return true;
       // Main demo appears in regular unless hidden
       if (p.id === mainDemoId && !hiddenFromRegularDemos.includes(mainDemoId)) {
@@ -42,8 +66,9 @@ function GlobalDashboard() {
       }
       return false;
     });
+    
     return { demoProjects: demos, regularProjects: regular };
-  }, [projects, hiddenFromRegularDemos]);
+  }, [projects, hiddenFromRegularDemos, showHiddenProjects]);
 
   // Auto-expand demo section only when a new demo project is restored (count increases)
   useEffect(() => {
@@ -56,28 +81,121 @@ function GlobalDashboard() {
     }
   }, [demoProjects.length, previousDemoCount]);
 
+  // Load materials data to check client approval status
+  // Note: We load ALL materials here (no project filter) to check across all projects
+  useEffect(() => {
+    async function loadMaterials() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/materials?ts=${Date.now()}`, {
+          cache: 'no-store'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setMaterialsData(data);
+        }
+      } catch (err) {
+        console.warn('Failed to load materials for client approval check:', err);
+      }
+    }
+    loadMaterials();
+  }, []);
+
   // Calculate project metrics
   const projectMetrics = useMemo(() => {
+    // Helper function to check if a project is client approved
+    // This checks if all items that have been validated (or sent for validation) are approved by the client
+    const checkProjectClientApproved = (project) => {
+      if (!materialsData?.sections) {
+        // If no materials data, fall back to devisStatus check
+        return project.devisStatus === 'approved';
+      }
+      
+      // Try to match project by chantier field or project name/address
+      const projectName = project.name || project.address || '';
+      const projectId = project.id || '';
+      
+      // Check all items in materials to see if they belong to this project
+      let totalItemsWithValidation = 0;
+      let totalApproved = 0;
+      let totalPending = 0;
+      
+      materialsData.sections.forEach((section) => {
+        section.items?.forEach((item) => {
+          const itemChantier = item?.chantier || '';
+          
+          // Match by chantier containing project name/address, or by project ID
+          // Also try matching by project name containing parts of chantier
+          const matchesProject = 
+            (projectName && itemChantier.toLowerCase().includes(projectName.toLowerCase())) ||
+            (projectId && itemChantier.toLowerCase().includes(projectId.toLowerCase())) ||
+            (itemChantier && projectName.toLowerCase().includes(itemChantier.toLowerCase())) ||
+            // Also check if project name matches chantier exactly (case-insensitive)
+            (itemChantier && projectName.toLowerCase() === itemChantier.toLowerCase());
+          
+          if (matchesProject) {
+            const clientStatus = item?.approvals?.client?.status;
+            const wasSentForValidation = item?.approvals?.client?.sentForValidation || 
+                                         item?.approvals?.client?.sentAt;
+            const hasValidationStatus = clientStatus && 
+                                       (clientStatus === 'approved' || 
+                                        clientStatus === 'pending' || 
+                                        clientStatus === 'rejected' || 
+                                        clientStatus === 'alternative' ||
+                                        clientStatus === 'supplied_by');
+            
+            // Count items that either:
+            // 1. Were sent for validation, OR
+            // 2. Have a client validation status set (approved/pending/rejected/alternative/supplied_by)
+            if (wasSentForValidation || hasValidationStatus) {
+              totalItemsWithValidation++;
+              
+              if (clientStatus === 'approved') {
+                totalApproved++;
+              } else if (clientStatus === 'pending') {
+                totalPending++;
+              }
+            }
+          }
+        });
+      });
+      
+      // Project is approved if:
+      // 1. There are items with validation status, AND
+      // 2. All items are approved (no pending or rejected items)
+      if (totalItemsWithValidation > 0) {
+        return totalApproved === totalItemsWithValidation && totalPending === 0;
+      }
+      
+      // If no items have validation status, fall back to devisStatus check
+      return project.devisStatus === 'approved';
+    };
     // Separate real projects from demo projects
     const realProjects = regularProjects.filter(p => !p.isDemo);
     const mainDemoId = 'demo-project';
     const mainDemoProject = regularProjects.find(p => p.isDemo && p.id === mainDemoId);
     
     // Determine which projects to include in metrics:
-    // - If there are real projects (even if demo also exists): ONLY use real projects (exclude demo)
-    // - If there are NO real projects: Include demo project (for demo-only metrics)
+    // - Always include the main demo project (Demo Renovation Project) if it's in regularProjects
+    //   (i.e., not hidden/moved to "More Demo Projects" section)
+    // - Include all real projects
+    // - Only exclude demo if it's been moved to the demo section (not in regularProjects)
     const hasRealProjects = realProjects.length > 0;
-    const allProjects = hasRealProjects
-      ? realProjects  // Hybrid case: demo + real = exclude demo, only use real projects
-      : mainDemoProject 
-        ? [mainDemoProject]  // Demo-only case: include demo project
-        : [];  // No projects at all
+    const allProjects = [];
+    
+    // Always add real projects
+    allProjects.push(...realProjects);
+    
+    // Add main demo project if it's still in regularProjects (not moved to demo section)
+    if (mainDemoProject) {
+      allProjects.push(mainDemoProject);
+    }
     
     // Check if metrics are showing demo-only data (only when there are no real projects)
     const isDemoOnly = !hasRealProjects && mainDemoProject !== undefined;
     
     const totalProjects = allProjects.length;
-    const clientApproved = allProjects.filter(p => p.devisStatus === 'approved').length;
+    // Check client approval based on materials validation status
+    const clientApproved = allProjects.filter(p => checkProjectClientApproved(p)).length;
     const activeProjects = allProjects.filter(p => p.status === 'active').length;
     const completedProjects = allProjects.filter(p => p.status === 'completed').length;
     const readyProjects = allProjects.filter(p => p.status === 'ready').length;
@@ -122,7 +240,7 @@ function GlobalDashboard() {
       averageProjectCost,
       isDemoOnly, // Flag to indicate if metrics are demo-only
     };
-  }, [regularProjects]);
+  }, [regularProjects, materialsData]);
 
   return (
     <>
@@ -131,7 +249,16 @@ function GlobalDashboard() {
           <h2>{t('globalDashboardTitle')}</h2>
           <p>{t('globalDashboardSubtitle')}</p>
         </div>
-        <div className="status-legend-inline">
+        <div className="status-legend-inline" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <label className="show-hidden-toggle" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.875rem', color: '#6b7280' }}>
+            <input
+              type="checkbox"
+              checked={showHiddenProjects}
+              onChange={(e) => setShowHiddenProjects(e.target.checked)}
+              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+            />
+            <span>{t('showHiddenProjects') || 'Show Hidden Projects'}</span>
+          </label>
           <button
             type="button"
             className="status-legend-toggle"

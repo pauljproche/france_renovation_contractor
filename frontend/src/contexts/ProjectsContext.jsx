@@ -296,9 +296,10 @@ export function ProjectsProvider({ children }) {
         const userId = sessionStorage.getItem('userId');
         
         // Build URL with user_id parameter if available
+        // Always include hidden projects so we can filter them in the frontend
         const url = userId 
-          ? `${API_BASE_URL}/api/projects?user_id=${encodeURIComponent(userId)}`
-          : `${API_BASE_URL}/api/projects`;
+          ? `${API_BASE_URL}/api/projects?user_id=${encodeURIComponent(userId)}&include_hidden=true`
+          : `${API_BASE_URL}/api/projects?include_hidden=true`;
         
         const response = await fetch(url);
         if (response.ok) {
@@ -524,9 +525,49 @@ export function ProjectsProvider({ children }) {
     });
   };
 
+  const toggleProjectHidden = async (id, hidden) => {
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ hidden }),
+      });
+
+      if (response.ok) {
+        const updatedProject = await response.json();
+        console.log('Project hidden toggled:', { id, hidden, updatedProject });
+        
+        // Update the project in the list and localStorage
+        setProjects((prev) => {
+          const updated = prev.map((p) => (p.id === id ? { ...p, ...updatedProject } : p));
+          // Update localStorage with the new state
+          localStorage.setItem('renovationProjects', JSON.stringify(updated));
+          return updated;
+        });
+      } else {
+        const error = await response.json();
+        console.error('Error toggling project hidden:', error);
+        alert(`Failed to ${hidden ? 'hide' : 'show'} project: ${error.detail || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error toggling project hidden:', error);
+      alert(`Failed to ${hidden ? 'hide' : 'show'} project: ${error.message}`);
+    }
+  };
+
   const deleteProject = async (id) => {
     // Don't allow deleting demo projects
     if (id === DEMO_PROJECT_ID || id === EMPTY_DEMO_PROJECT_ID || id === PENDING_APPROVAL_DEMO_PROJECT_ID) {
+      return;
+    }
+    
+    // Check if project is a system project (cannot be deleted)
+    const project = projects.find(p => p.id === id);
+    if (project?.isSystem) {
+      console.warn(`Cannot delete system project: ${project.name}`);
       return;
     }
     
@@ -676,6 +717,7 @@ export function ProjectsProvider({ children }) {
         createProject,
         updateProject,
         deleteProject,
+        toggleProjectHidden,
         getProject,
         selectedProjectId,
         selectedProject,

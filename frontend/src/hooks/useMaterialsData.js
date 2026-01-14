@@ -130,7 +130,14 @@ export function useMaterialsData() {
       }
 
       try {
-        const response = await fetch(`${dataEndpoint}?ts=${Date.now()}`, {
+        // Build query parameters
+        const params = new URLSearchParams({ ts: Date.now().toString() });
+        // Add project_id if we have a selected project (and it's not a demo project using static file)
+        if (selectedProject?.id && dataEndpoint === DATA_ENDPOINT) {
+          params.append('project_id', selectedProject.id);
+        }
+        
+        const response = await fetch(`${dataEndpoint}?${params.toString()}`, {
           cache: 'no-store'
         });
         if (!response.ok) {
@@ -138,7 +145,15 @@ export function useMaterialsData() {
         }
         const json = await response.json();
         if (isMounted) {
-          setData(json);
+          // If no sections exist, initialize with empty structure
+          if (!json.sections || json.sections.length === 0) {
+            setData({
+              currency: 'EUR',
+              sections: []
+            });
+          } else {
+            setData(json);
+          }
         }
       } catch (err) {
         if (isMounted) {
@@ -175,7 +190,15 @@ export function useMaterialsData() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/materials`, {
+      // Build query parameters
+      const params = new URLSearchParams();
+      // Add project_id if we have a selected project
+      if (selectedProject?.id) {
+        params.append('project_id', selectedProject.id);
+      }
+      
+      const url = `${API_BASE_URL}/api/materials${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -189,13 +212,27 @@ export function useMaterialsData() {
       }
 
       // Reload data from the server
-      const response_data = await fetch(`${DATA_ENDPOINT}?ts=${Date.now()}`, {
+      const reloadParams = new URLSearchParams({ ts: Date.now().toString() });
+      if (selectedProject?.id) {
+        reloadParams.append('project_id', selectedProject.id);
+      }
+      const response_data = await fetch(`${DATA_ENDPOINT}?${reloadParams.toString()}`, {
         cache: 'no-store'
       });
       if (!response_data.ok) {
         throw new Error(`Failed to reload materials (${response_data.status})`);
       }
       const json = await response_data.json();
+      console.log('Reloaded data from server:', json);
+      // Ensure sections have items arrays initialized
+      if (json.sections) {
+        json.sections.forEach(section => {
+          if (!Array.isArray(section.items)) {
+            section.items = [];
+          }
+        });
+      }
+      console.log('Setting data with sections:', json.sections?.length, 'items in first section:', json.sections?.[0]?.items?.length);
       setData(json);
       window.dispatchEvent(new CustomEvent(MATERIALS_RELOAD_EVENT, {
         detail: { sourceId: instanceIdRef.current }

@@ -334,19 +334,30 @@ def json_to_item(item_data: Dict[str, Any], section: Section, session: Session) 
     return item
 
 
-def get_materials_dict(session: Session) -> Dict[str, Any]:
+def get_materials_dict(session: Session, project_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Get all materials from database and convert to JSON format.
+    Get materials from database and convert to JSON format.
+    
+    Args:
+        session: Database session
+        project_id: Optional project ID to filter materials by project.
+                   If None, returns all materials (backward compatible).
     
     Returns:
         dict: Materials data in JSON format (same as materials.json structure)
     """
-    sections = session.query(Section).options(
+    query = session.query(Section).options(
         joinedload(Section.items).joinedload(Item.approvals).joinedload(Approval.replacement_urls),
         joinedload(Section.items).joinedload(Item.order),
         joinedload(Section.items).joinedload(Item.comments),
         joinedload(Section.project)
-    ).order_by(Section.id).all()
+    )
+    
+    # Filter by project_id if provided
+    if project_id:
+        query = query.filter(Section.project_id == project_id)
+    
+    sections = query.order_by(Section.id).all()
     
     sections_data = []
     for section in sections:
@@ -369,7 +380,7 @@ def get_materials_dict(session: Session) -> Dict[str, Any]:
     }
 
 
-def save_materials_dict(materials_data: Dict[str, Any], session: Session) -> None:
+def save_materials_dict(materials_data: Dict[str, Any], session: Session, project_id: Optional[str] = None) -> None:
     """
     Save materials data (JSON format) to database.
     
@@ -381,6 +392,9 @@ def save_materials_dict(materials_data: Dict[str, Any], session: Session) -> Non
     Args:
         materials_data: Materials data in JSON format (same as materials.json structure)
         session: Database session
+        project_id: Optional project ID to associate materials with a project.
+                   If provided, all sections will be associated with this project.
+                   If None, sections keep their existing project_id or remain NULL (backward compatible).
     """
     sections_data = materials_data.get("sections", [])
     
@@ -392,12 +406,15 @@ def save_materials_dict(materials_data: Dict[str, Any], session: Session) -> Non
         section = session.query(Section).filter(Section.id == section_id).first()
         if section:
             section.label = section_label
+            # Update project_id if provided (only if it's not already set or explicitly updating)
+            if project_id is not None:
+                section.project_id = project_id
             section.updated_at = datetime.utcnow()
         else:
             section = Section(
                 id=section_id,
                 label=section_label,
-                project_id=None,  # Will be set based on chantier if projects exist
+                project_id=project_id,  # Set project_id if provided
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
             )

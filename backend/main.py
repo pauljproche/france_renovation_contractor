@@ -77,9 +77,13 @@ client = OpenAI(api_key=api_key) if api_key else None
 default_model = os.getenv("OPENAI_MODEL", "gpt-4o")
 
 
-def load_materials_data() -> dict:
+def load_materials_data(project_id: Optional[str] = None) -> dict:
     """
     Load materials data from database or JSON file based on USE_DATABASE flag.
+    
+    Args:
+        project_id: Optional project ID to filter materials by project.
+                   If None, returns all materials (backward compatible).
     
     Returns:
         dict: Materials data in JSON format
@@ -89,20 +93,20 @@ def load_materials_data() -> dict:
     if use_database:
         try:
             with db_readonly_session() as session:
-                return materials_service.get_materials_dict(session)
+                return materials_service.get_materials_dict(session, project_id=project_id)
         except Exception as e:
             logger.error(f"Failed to load materials from database: {e}")
             logger.warning("Falling back to JSON file")
-            # Fallback to JSON on error
+            # Fallback to JSON on error (no project filtering in JSON mode)
             with open(MATERIALS_FILE_PATH, encoding='utf-8') as f:
                 return json.load(f)
     else:
-        # Read from JSON file
+        # Read from JSON file (no project filtering in JSON mode)
         with open(MATERIALS_FILE_PATH, encoding='utf-8') as f:
             return json.load(f)
 
 
-def write_materials_data(data: dict) -> None:
+def write_materials_data(data: dict, project_id: Optional[str] = None) -> None:
     """
     Write materials data to database or JSON file based on USE_DATABASE flag.
     
@@ -111,6 +115,8 @@ def write_materials_data(data: dict) -> None:
     
     Args:
         data: Materials data dictionary in JSON format
+        project_id: Optional project ID to associate materials with a project.
+                   If None, materials are saved without project association (backward compatible).
     """
     use_database = os.getenv("USE_DATABASE", "false").lower() == "true"
     
@@ -118,7 +124,7 @@ def write_materials_data(data: dict) -> None:
         # Phase 6: Write to database only (no JSON writes)
         try:
             with db_session() as session:
-                materials_service.save_materials_dict(data, session)
+                materials_service.save_materials_dict(data, session, project_id=project_id)
                 session.commit()
                 logger.debug("Materials written to database successfully")
         except Exception as e:
@@ -2131,13 +2137,17 @@ async def extract_product_image(request: ImageExtractionRequest):
 
 
 @app.get("/api/materials")
-async def get_materials():
+async def get_materials(project_id: Optional[str] = None):
     """
     Get materials data from database or JSON file.
     Returns data in the same format as materials.json for frontend compatibility.
+    
+    Args:
+        project_id: Optional project ID to filter materials by project.
+                   If not provided, returns all materials (backward compatible).
     """
     try:
-        data = load_materials_data()
+        data = load_materials_data(project_id=project_id)
         return data
     except Exception as e:
         logger.error(f"Error loading materials data: {e}")
@@ -2148,10 +2158,15 @@ async def get_materials():
 
 
 @app.put("/api/materials")
-async def update_materials(update: MaterialsUpdate):
+async def update_materials(update: MaterialsUpdate, project_id: Optional[str] = None):
     """
     Update the materials.json file with new data.
     Validates the structure before saving.
+    
+    Args:
+        update: Materials data to save
+        project_id: Optional project ID to associate materials with a project.
+                   If not provided, materials are saved without project association (backward compatible).
     """
     try:
         # Basic validation - check required top-level fields
@@ -2164,8 +2179,8 @@ async def update_materials(update: MaterialsUpdate):
         if not isinstance(update.materials['sections'], list):
             raise HTTPException(status_code=400, detail="'sections' must be an array")
         
-        # Write to database and/or JSON (dual-write)
-        write_materials_data(update.materials)
+        # Write to database and/or JSON
+        write_materials_data(update.materials, project_id=project_id)
         
         return {"message": "Materials updated successfully", "status": "ok"}
     
@@ -2243,6 +2258,7 @@ class ProjectUpdate(BaseModel):
     status: Optional[str] = None
     startDate: Optional[str] = None
     endDate: Optional[str] = None
+    hidden: Optional[bool] = None
     invoiceCount: Optional[int] = None
     percentagePaid: Optional[int] = None
     hasData: Optional[bool] = None
@@ -2250,7 +2266,7 @@ class ProjectUpdate(BaseModel):
 
 
 @app.get("/api/projects")
-async def get_projects(user_id: Optional[str] = None):
+async def get_projects(user_id: Optional[str] = None, include_hidden: bool = False):
     """
     Get all projects from database.
     
@@ -2259,6 +2275,10 @@ async def get_projects(user_id: Optional[str] = None):
     - User is a member
     
     If user_id is not provided, returns all projects (for admin/backward compatibility).
+    
+    Args:
+        user_id: Optional user ID to filter projects by membership
+        include_hidden: If True, includes hidden projects (default: False)
     
     Returns 501 if database not enabled (frontend should use localStorage fallback).
     """
@@ -2272,7 +2292,7 @@ async def get_projects(user_id: Optional[str] = None):
     
     try:
         with db_readonly_session() as session:
-            projects = projects_service.get_all_projects(session, user_id=user_id)
+            projects = projects_service.get_all_projects(session, user_id=user_id, include_hidden=include_hidden)
             return {"projects": projects, "count": len(projects)}
     except Exception as e:
         logger.error(f"Error getting projects: {e}")
@@ -2398,6 +2418,9 @@ async def delete_project(project_id: str):
             if not deleted:
                 raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
             return {"message": "Project deleted successfully", "status": "ok"}
+    except ValueError as e:
+        # System project cannot be deleted
+        raise HTTPException(status_code=403, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:

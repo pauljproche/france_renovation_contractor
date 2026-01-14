@@ -324,10 +324,17 @@ export default function EditableMaterialsTable({ search }) {
   // Get all items with their section info and apply search filter and role-based filtering
   const allItems = useMemo(() => {
     if (!data?.sections) {
+      console.log('allItems: No sections in data');
       return [];
     }
+    console.log('allItems: Processing', data.sections.length, 'sections');
     const items = [];
     data.sections.forEach((section) => {
+      console.log('allItems: Section', section.id, 'has', section.items?.length || 0, 'items');
+      if (!section.items || !Array.isArray(section.items)) {
+        console.warn('allItems: Section', section.id, 'has no items array');
+        return;
+      }
       section.items.forEach((item, itemIndex) => {
         items.push({
           ...item,
@@ -393,6 +400,7 @@ export default function EditableMaterialsTable({ search }) {
       });
     }
     
+    console.log('allItems: Final filtered items count:', filteredItems.length);
     return filteredItems;
   }, [data, search, role, customRoles, selectedChantier]);
 
@@ -1144,7 +1152,7 @@ export default function EditableMaterialsTable({ search }) {
     saveChanges(newData);
   };
 
-  const handleAddRow = (sectionId) => {
+  const handleAddRow = async (sectionId) => {
     // Prevent adding rows if user is a client role
     if (isClientRole) {
       return;
@@ -1152,10 +1160,18 @@ export default function EditableMaterialsTable({ search }) {
 
     const newData = { ...data };
     const section = newData.sections.find(s => s.id === sectionId);
-    if (!section) return;
+    if (!section) {
+      console.warn('Section not found:', sectionId);
+      return;
+    }
+    
+    // Initialize items array if it doesn't exist
+    if (!section.items) {
+      section.items = [];
+    }
     
     const newItem = {
-      product: '',
+      product: `New Item ${Date.now()}`, // Start with a unique placeholder name so it's not empty and doesn't conflict
       reference: null,
       supplierLink: null,
       laborType: null,
@@ -1196,13 +1212,54 @@ export default function EditableMaterialsTable({ search }) {
       });
     }
     
+    if (!Array.isArray(section.items)) {
+      section.items = [];
+    }
     section.items.push(newItem);
+    console.log('Added item to section:', sectionId, 'New item count:', section.items.length);
+    
+    try {
+      const result = await saveChanges(newData);
+      if (result.success) {
+        console.log('Save successful, data should reload');
+      } else {
+        console.error('Save failed:', result.error);
+      }
+    } catch (err) {
+      console.error('Error saving new item:', err);
+    }
+  };
+
+  // Function to create first section if none exist
+  const handleCreateFirstSection = () => {
+    if (isClientRole) return;
+    
+    const newData = {
+      currency: data?.currency || 'EUR',
+      sections: [
+        {
+          id: 'section-1',
+          label: 'New Section',
+          items: []
+        }
+      ]
+    };
     saveChanges(newData);
   };
 
   if (loading) return <div className="loader">{t('loadingData')}</div>;
   if (error) return <div className="warning">{error}</div>;
   if (!data) return <div className="warning">{t('noData') || 'No data available'}</div>;
+  
+  // Check if we have no sections at all (not just no search results)
+  const hasNoSections = !data.sections || data.sections.length === 0;
+  
+  // Check if we have sections but no items
+  const hasSectionsButNoItems = data.sections && data.sections.length > 0 && 
+    data.sections.every(section => !section.items || section.items.length === 0);
+  
+  // Get first section ID for adding items when sections exist but are empty
+  const firstSectionId = data.sections && data.sections.length > 0 ? data.sections[0].id : null;
 
   return (
     <>
@@ -1579,7 +1636,48 @@ export default function EditableMaterialsTable({ search }) {
           </tr>
         </thead>
         <tbody>
-          {sortedAndGroupedItems.length === 0 ? (
+          {hasNoSections ? (
+            <tr>
+              <td colSpan={tableColSpan} style={{ textAlign: 'center', padding: '40px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                  <p style={{ margin: 0, color: '#6b7280' }}>
+                    {t('noMaterialsForProject') || 'No materials yet for this project.'}
+                  </p>
+                  {!isClientRole && (
+                    <button
+                      onClick={handleCreateFirstSection}
+                      className="add-row-btn"
+                      style={{ padding: '8px 16px', fontSize: '0.875rem' }}
+                    >
+                      {t('createFirstSection') || '+ Create First Section'}
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ) : hasSectionsButNoItems ? (
+            <tr>
+              <td colSpan={tableColSpan} style={{ textAlign: 'center', padding: '40px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                  <p style={{ margin: 0, color: '#6b7280' }}>
+                    {t('noItemsInSections') || 'No items in sections yet.'}
+                  </p>
+                        {!isClientRole && firstSectionId && (
+                          <button
+                            onClick={() => {
+                              console.log('Adding item to section:', firstSectionId);
+                              handleAddRow(firstSectionId);
+                            }}
+                            className="add-row-btn"
+                            style={{ padding: '8px 16px', fontSize: '0.875rem' }}
+                          >
+                            {t('addFirstItem') || '+ Add First Item'}
+                          </button>
+                        )}
+                </div>
+              </td>
+            </tr>
+          ) : sortedAndGroupedItems.length === 0 ? (
             <tr>
               <td colSpan={tableColSpan}>{t('noSearchResults')}</td>
             </tr>
@@ -1593,10 +1691,22 @@ export default function EditableMaterialsTable({ search }) {
                       {!isClientRole && (
                         <button 
                           className="add-row-btn"
-                          onClick={() => {
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             // Add to first section in group, or use original section
                             const firstItem = group.items[0];
-                            handleAddRow(firstItem.sectionId);
+                            console.log('+ button clicked, group:', group, 'firstItem:', firstItem);
+                            if (firstItem && firstItem.sectionId) {
+                              console.log('Adding row to section:', firstItem.sectionId);
+                              try {
+                                await handleAddRow(firstItem.sectionId);
+                              } catch (err) {
+                                console.error('Error adding row:', err);
+                              }
+                            } else {
+                              console.error('Cannot add row: no section ID found', firstItem, 'group:', group);
+                            }
                           }}
                           title="Add row"
                         >
@@ -2027,7 +2137,48 @@ export default function EditableMaterialsTable({ search }) {
                 </tr>
               </thead>
               <tbody>
-                {sortedAndGroupedItems.length === 0 ? (
+                {hasNoSections ? (
+                  <tr>
+                    <td colSpan={customColumnOrder.length} style={{ textAlign: 'center', padding: '40px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                        <p style={{ margin: 0, color: '#6b7280' }}>
+                          {t('noMaterialsForProject') || 'No materials yet for this project.'}
+                        </p>
+                        {!isClientRole && (
+                          <button
+                            onClick={handleCreateFirstSection}
+                            className="add-row-btn"
+                            style={{ padding: '8px 16px', fontSize: '0.875rem' }}
+                          >
+                            {t('createFirstSection') || '+ Create First Section'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : hasSectionsButNoItems ? (
+                  <tr>
+                    <td colSpan={customColumnOrder.length} style={{ textAlign: 'center', padding: '40px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                        <p style={{ margin: 0, color: '#6b7280' }}>
+                          {t('noItemsInSections') || 'No items in sections yet.'}
+                        </p>
+                        {!isClientRole && firstSectionId && (
+                          <button
+                            onClick={() => {
+                              console.log('Adding item to section:', firstSectionId);
+                              handleAddRow(firstSectionId);
+                            }}
+                            className="add-row-btn"
+                            style={{ padding: '8px 16px', fontSize: '0.875rem' }}
+                          >
+                            {t('addFirstItem') || '+ Add First Item'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : sortedAndGroupedItems.length === 0 ? (
                   <tr>
                     <td colSpan={customColumnOrder.length}>{t('noSearchResults')}</td>
                   </tr>

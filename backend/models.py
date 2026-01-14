@@ -144,6 +144,8 @@ class Project(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     is_demo = Column(Boolean, default=False, nullable=False)
     has_data = Column(Boolean, default=False, nullable=False)
+    hidden = Column(Boolean, default=False, nullable=False)  # Hide project from main list (can still access via direct link)
+    is_system = Column(Boolean, default=False, nullable=False)  # System projects cannot be deleted (e.g., Legacy Materials, Demo Renovation Project)
     
     # Relationships
     owner = relationship('User', foreign_keys=[owner_id], back_populates='owned_projects')

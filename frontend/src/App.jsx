@@ -10,6 +10,7 @@ import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
 import SignUp from './pages/SignUp.jsx';
 import GlobalDashboard from './pages/GlobalDashboard.jsx';
+import NewGlobalDashboard from './pages/NewGlobalDashboard.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Materials from './pages/Materials.jsx';
 import ChatHistory from './pages/ChatHistory.jsx';
@@ -39,6 +40,7 @@ function App() {
                 <Route path="/signup" element={<SignUp />} />
                 <Route element={<Layout />}>
                   <Route path="/global-dashboard" element={<GlobalDashboard />} />
+                  <Route path="/new-global-dashboard" element={<NewGlobalDashboard />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/timeline" element={<Timeline />} />

@@ -108,6 +108,8 @@ def project_to_json(project: Project, session: Optional[Session] = None) -> Dict
         "status": map_project_status_from_enum(project.status),
         "isDemo": project.is_demo,
         "hasData": project.has_data,
+        "hidden": project.hidden if hasattr(project, 'hidden') else False,
+        "isSystem": project.is_system if hasattr(project, 'is_system') else False,
         "invoiceCount": project.invoice_count,
         "percentagePaid": project.percentage_paid,
         "devisStatus": None
@@ -203,7 +205,7 @@ def json_to_project(project_data: Dict[str, Any], session: Session, owner_user: 
     return project
 
 
-def get_all_projects(session: Session, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_all_projects(session: Session, user_id: Optional[str] = None, include_hidden: bool = False) -> List[Dict[str, Any]]:
     """
     Get all projects from database (excluding demos) and convert to JSON format.
     
@@ -216,11 +218,16 @@ def get_all_projects(session: Session, user_id: Optional[str] = None) -> List[Di
     Args:
         session: Database session
         user_id: Optional user ID to filter projects by membership
+        include_hidden: If False, excludes hidden projects (default: False)
     
     Returns:
         list: List of project dictionaries (compatible with localStorage format)
     """
     query = session.query(Project).filter(Project.is_demo == False)
+    
+    # Filter out hidden projects unless explicitly requested
+    if not include_hidden:
+        query = query.filter(Project.hidden == False)
     
     # Filter by user membership if user_id provided
     if user_id:
@@ -322,6 +329,13 @@ def update_project(session: Session, project_id: str, updates: Dict[str, Any]) -
         project.end_date = parse_date(updates["endDate"])
     if "hasData" in updates:
         project.has_data = updates["hasData"]
+    if "hidden" in updates:
+        # Allow hiding any project (including system projects)
+        # System projects can be hidden but cannot be deleted
+        project.hidden = updates["hidden"]
+    if "isSystem" in updates:
+        # Prevent changing is_system flag (security - only via direct DB update)
+        pass  # Don't allow changing this via API
     if "devisStatus" in updates:
         devis_status = updates["devisStatus"]
         if devis_status:
@@ -361,10 +375,17 @@ def delete_project(session: Session, project_id: str) -> bool:
     
     Returns:
         bool: True if deleted, False if not found
+    
+    Raises:
+        ValueError: If project is a system project and cannot be deleted
     """
     project = session.query(Project).filter(Project.id == project_id).first()
     if not project:
         return False
+    
+    # Prevent deletion of system projects
+    if project.is_system:
+        raise ValueError(f"Cannot delete system project '{project.name}' (ID: {project_id})")
     
     session.delete(project)
     session.flush()
